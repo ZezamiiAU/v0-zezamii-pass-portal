@@ -1,9 +1,10 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server"
-import { QRGeneratorClient } from "./qr-generator-client"
+import { PassesClient } from "./passes-client"
 
-export default async function QRGeneratorPage() {
+export default async function PassesPage() {
   const supabase = await createSupabaseServerClient()
 
+  // Get organizations with pass module
   const { data: orgModuleLicenses } = await supabase
     .schema("core")
     .from("org_module_licenses")
@@ -12,12 +13,13 @@ export default async function QRGeneratorPage() {
 
   const orgIdsWithPassModule = orgModuleLicenses?.map((license) => license.org_id) || []
 
+  // Fetch all devices with passes
   const { data: devices } = await supabase
     .schema("core")
     .from("v_devices_with_passes")
     .select("*")
-    .in("org_id", orgIdsWithPassModule.length > 0 ? orgIdsWithPassModule : ["00000000-0000-0000-0000-000000000000"]) // Use dummy UUID if no orgs have pass module
+    .in("org_id", orgIdsWithPassModule.length > 0 ? orgIdsWithPassModule : ["00000000-0000-0000-0000-000000000000"])
     .order("org_name", { ascending: true })
 
-  return <QRGeneratorClient devices={devices || []} />
+  return <PassesClient devices={devices || []} />
 }

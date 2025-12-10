@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Building2, FileUp, Home, MapPin, Package, Settings, CreditCard, LogOut, QrCode } from "lucide-react"
-import type { User } from "@supabase/supabase-js"
+import { mockSignOut } from "@/lib/auth/mock-auth"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: Home },
@@ -18,14 +18,12 @@ const navigation = [
   { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ]
 
-async function signOut() {
-  const { createClient } = await import("@/lib/supabase/client")
-  const supabase = createClient()
-  await supabase.auth.signOut()
+function signOut() {
+  mockSignOut()
   window.location.href = "/auth/login"
 }
 
-export function DashboardNav({ user }: { user: User }) {
+export function DashboardNav({ user }: { user: { email: string } }) {
   const pathname = usePathname()
 
   return (

@@ -1,22 +1,42 @@
-import type React from "react"
-import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
-import { DashboardNav } from "@/components/dashboard-nav"
+"use client"
 
-export default async function DashboardLayout({
+import type React from "react"
+import { useRouter } from "next/navigation"
+import { DashboardNav } from "@/components/dashboard-nav"
+import { getMockUser } from "@/lib/auth/mock-auth"
+import { useEffect, useState } from "react"
+
+export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
+  const router = useRouter()
+  const [user, setUser] = useState<{ id: string; email: string } | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
+  useEffect(() => {
+    const mockUser = getMockUser()
 
-  if (error || !user) {
-    redirect("/auth/login")
+    if (!mockUser) {
+      router.push("/auth/login")
+      return
+    }
+
+    setUser(mockUser)
+    setLoading(false)
+  }, [router])
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return null
   }
 
   return (
