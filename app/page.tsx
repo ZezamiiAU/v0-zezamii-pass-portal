@@ -1,15 +1,6 @@
 import { redirect } from "next/navigation"
-import { createSupabaseServerClient } from "@/lib/supabase/server"
 
-export default async function HomePage() {
-  const supabase = await createSupabaseServerClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (user) {
-    redirect("/dashboard")
-  } else {
-    redirect("/auth/login")
-  }
+// Redirect directly to the public request pass page
+export default function HomePage() {
+  redirect("/request-pass")
 }
