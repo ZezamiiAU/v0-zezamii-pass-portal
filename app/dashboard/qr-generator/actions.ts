@@ -1,11 +1,11 @@
 "use server"
 
-import { createSupabaseServerClient } from "@/lib/supabase/server"
+import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 
 export async function deleteQRPass(passId: string) {
   try {
-    const supabase = await createSupabaseServerClient()
+    const supabase = await createClient()
 
     const { error } = await supabase.schema("core").from("qr_passes").delete().eq("id", passId)
 
@@ -25,7 +25,7 @@ export async function deleteQRPass(passId: string) {
 
 export async function createQRPass(deviceId: string, passLabel = "Default Pass") {
   try {
-    const supabase = await createSupabaseServerClient()
+    const supabase = await createClient()
 
     // Insert new QR pass
     const { data, error } = await supabase

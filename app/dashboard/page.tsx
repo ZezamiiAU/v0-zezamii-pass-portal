@@ -1,9 +1,12 @@
+import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FileUp, Building2, MapPin, QrCode } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 
 export default async function DashboardPage() {
+  const supabase = await createClient()
+
   // Stats display removed until we have a working solution
 
   const quickLinks = [

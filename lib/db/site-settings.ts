@@ -1,4 +1,4 @@
-import { createSupabaseServerClient } from "@/lib/supabase/server"
+import { createClient } from "@/lib/supabase/server"
 
 /**
  * Site Settings Database Operations
@@ -16,7 +16,7 @@ export interface SiteSettings {
  * Get site settings by site ID
  */
 export async function getSiteSettings(siteId: string): Promise<SiteSettings | null> {
-  const supabase = await createSupabaseServerClient()
+  const supabase = await createClient()
 
   const { data, error } = await supabase.from("site_settings").select("*").eq("site_id", siteId).single()
 
@@ -35,7 +35,7 @@ export async function updateSiteSettings(
   siteId: string,
   settings: Partial<Omit<SiteSettings, "id" | "site_id" | "created_at" | "updated_at">>,
 ): Promise<SiteSettings | null> {
-  const supabase = await createSupabaseServerClient()
+  const supabase = await createClient()
 
   const { data, error } = await supabase.from("site_settings").update(settings).eq("site_id", siteId).select().single()
 
@@ -51,7 +51,7 @@ export async function updateSiteSettings(
  * Create or update site settings (upsert)
  */
 export async function upsertSiteSettings(siteId: string, pincodeDigitLength: number): Promise<SiteSettings | null> {
-  const supabase = await createSupabaseServerClient()
+  const supabase = await createClient()
 
   const { data, error } = await supabase
     .from("site_settings")
@@ -79,7 +79,7 @@ export async function upsertSiteSettings(siteId: string, pincodeDigitLength: num
  * Get effective pincode settings for a pass
  */
 export async function getEffectivePincodeSettings(passId: string) {
-  const supabase = await createSupabaseServerClient()
+  const supabase = await createClient()
 
   const { data, error } = await supabase.from("v_effective_pincode_settings").select("*").eq("pass_id", passId).single()
 

@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { mockSignUp } from "@/lib/auth/mock-auth"
+import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -21,6 +21,7 @@ export default function SignUpPage() {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
+    const supabase = createClient()
     setIsLoading(true)
     setError(null)
 
@@ -31,12 +32,15 @@ export default function SignUpPage() {
     }
 
     try {
-      if (!email) {
-        throw new Error("Email is required")
-      }
-
-      mockSignUp(email)
-      router.push("/dashboard")
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/dashboard`,
+        },
+      })
+      if (error) throw error
+      router.push("/auth/sign-up-success")
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred")
     } finally {
@@ -74,7 +78,6 @@ export default function SignUpPage() {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="(not validated in mock mode)"
                   />
                 </div>
                 <div className="grid gap-2">

@@ -1,8 +1,18 @@
-import { createSupabaseServerClient } from "@/lib/supabase/server"
+import { redirect } from "next/navigation"
+import { createClient } from "@/lib/supabase/server"
 import { QRGeneratorClient } from "./qr-generator-client"
 
 export default async function QRGeneratorPage() {
-  const supabase = await createSupabaseServerClient()
+  const supabase = await createClient()
+
+  // Check authentication
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect("/auth/login")
+  }
 
   const { data: orgModuleLicenses } = await supabase
     .schema("core")
