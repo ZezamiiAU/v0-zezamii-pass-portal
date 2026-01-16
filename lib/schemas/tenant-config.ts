@@ -116,7 +116,7 @@ export const deviceSchema = z.object({
   rotation: z.number().int().default(0),
   code: z.string().optional(),
   serial: z.string().optional(),
-  lock_id: z.number().int().optional(), // Changed from z.string() to z.number().int() since lock_id is INTEGER in database
+  lock_id: z.union([z.number().int(), z.string()]).optional(), // Accept both string and number for lock_id
   customer_name: z.string().optional(),
   work_order_ref: z.string().optional(),
   customer_id: customIdSchema.nullable().optional(),

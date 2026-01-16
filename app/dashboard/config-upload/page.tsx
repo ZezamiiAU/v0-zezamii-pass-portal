@@ -619,33 +619,44 @@ export default function ConfigUploadPage() {
                           <p>• {validatedConfig.passTypes?.length || 0} pass type(s)</p>
                         </div>
                       </div>
-                      <div className="mt-3 p-3 bg-white dark:bg-gray-900 rounded border border-green-200 dark:border-green-800">
-                        <p className="font-semibold text-sm mb-1">Next Steps:</p>
-                        <ol className="text-sm list-decimal list-inside space-y-1">
-                          <li>
-                            Save file to your{" "}
-                            <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">/scripts</code> folder
-                          </li>
-                          <li>Run the SQL script in your database</li>
-                          <li>Check QR Generator to see your devices</li>
-                        </ol>
-                      </div>
+                      {validatedConfig.devices && validatedConfig.devices.length > 0 && (
+                        <div>
+                          <h3 className="font-semibold mb-2">Devices:</h3>
+                          <ul className="list-disc list-inside text-sm space-y-1">
+                            {validatedConfig.devices.map((device: any, idx: number) => (
+                              <li key={idx}>
+                                {device.name} ({device.category})
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {validatedConfig.passTypes && validatedConfig.passTypes.length > 0 && (
+                        <div>
+                          <h3 className="font-semibold mb-2">Pass Types:</h3>
+                          <ul className="list-disc list-inside text-sm space-y-1">
+                            {validatedConfig.passTypes.map((passType: any, idx: number) => (
+                              <li key={idx}>
+                                {passType.name} - ${(passType.price_cents / 100).toFixed(2)}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </AlertDescription>
                   </Alert>
                 </div>
               )}
 
-              {validationResult === "failed" && (
+              {validationResult === "failed" && validationErrors.length > 0 && (
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Validation Errors:</AlertTitle>
                   <AlertDescription>
-                    <div className="font-semibold mb-2">Validation Errors:</div>
-                    <ul className="list-disc list-inside space-y-1">
-                      {validationErrors.map((error, idx) => (
-                        <li key={idx} className="text-sm">
-                          {error}
-                        </li>
-                      ))}
+                    <ul className="list-disc list-inside space-y-1 mt-2">
+                      {Array.isArray(validationErrors) &&
+                        validationErrors.map((error, idx) => <li key={idx}>{error}</li>)}
                     </ul>
                   </AlertDescription>
                 </Alert>

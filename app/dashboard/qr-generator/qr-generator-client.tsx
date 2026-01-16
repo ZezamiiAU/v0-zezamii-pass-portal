@@ -281,22 +281,22 @@ export function QRGeneratorClient({ devices, sites }: QRGeneratorClientProps) {
                     </Button>
                   </div>
 
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/50">
+                  <div className="flex items-center gap-3 py-3 border-t">
                     <div className="p-2 rounded-md bg-background">
                       <Lock className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-xs text-muted-foreground mb-0.5">Lock ID</div>
                       <code className="text-sm font-mono truncate block">
-                        {selectedDevice.lock_id !== null ? selectedDevice.lock_id.toString() : "Not set"}
+                        {selectedDevice.lock_id != null ? selectedDevice.lock_id.toString() : "Not set"}
                       </code>
                     </div>
-                    {selectedDevice.lock_id !== null && (
+                    {selectedDevice.lock_id != null && (
                       <Button
                         variant="ghost"
                         size="sm"
                         className="h-8 w-8 p-0 shrink-0"
-                        onClick={() => copyToClipboard(selectedDevice.lock_id.toString())}
+                        onClick={() => copyToClipboard(selectedDevice.lock_id!.toString())}
                       >
                         <Copy className="h-3.5 w-3.5" />
                       </Button>

@@ -308,13 +308,54 @@ export function excelDataToJson(sheets: { [sheetName: string]: ExcelRow[] }): Te
 
     // Parse Devices sheet and match to floors by name
     config.devices = (normalizedSheets["Devices"] || []).map((row) => {
-      const floorName = row.floor_name || row.floor
-      const floorId = floorIdMap.get(floorName as string) || config.floors[0]?.id
+      console.log("[v0] Device row keys:", Object.keys(row))
+      console.log("[v0] Device row:", JSON.stringify(row))
+      console.log("[v0] Available sites in map:", Array.from(siteIdMap.entries()))
+
+      const locationName = (row.parent_location_name ||
+        row.parent_location ||
+        row.parentlocation ||
+        row.parent_name ||
+        row.floor_name ||
+        row.floor ||
+        row.site_name ||
+        row.site ||
+        "") as string
+
+      console.log("[v0] Location name found:", locationName)
+
+      // Case-insensitive lookup - try to find in floor map first, then site map
+      const locationLower = locationName.toLowerCase().trim()
+      let floorId: string | undefined
+      let siteId: string | undefined
+
+      // Check floor map (case-insensitive)
+      for (const [key, value] of floorIdMap.entries()) {
+        if (key.toLowerCase().trim() === locationLower) {
+          floorId = value
+          console.log("[v0] Found floor match:", key, "->", value)
+          break
+        }
+      }
+
+      // If not found in floors, check site map (case-insensitive)
+      if (!floorId) {
+        for (const [key, value] of siteIdMap.entries()) {
+          if (key.toLowerCase().trim() === locationLower) {
+            siteId = value
+            console.log("[v0] Found site match:", key, "->", value)
+            break
+          }
+        }
+      }
+
+      console.log("[v0] Final result - siteId:", siteId, "floorId:", floorId)
 
       return {
         id: generateId(),
         org_id: orgId,
-        floor_id: floorId,
+        site_id: siteId || undefined,
+        floor_id: floorId || undefined,
         area_id: null,
         name: row.name,
         category: row.category,

@@ -287,6 +287,7 @@ BEGIN;
 CREATE TEMP TABLE IF NOT EXISTS site_id_map (config_id uuid, actual_id uuid);
 CREATE TEMP TABLE IF NOT EXISTS building_id_map (config_id uuid, actual_id uuid);
 CREATE TEMP TABLE IF NOT EXISTS floor_id_map (config_id uuid, actual_id uuid);
+CREATE TEMP TABLE IF NOT EXISTS device_id_map (config_id uuid, actual_id uuid);
 
 `
 
@@ -312,7 +313,7 @@ SELECT id INTO TEMP org_id_var FROM upserted_org;
 
 `
 
-  const preparedSites = config.sites.map((site) => prepareSiteForDB(site as unknown as Record<string, unknown>))
+  const preparedSites = (config.sites || []).map((site) => prepareSiteForDB(site as unknown as Record<string, unknown>))
   if (preparedSites.length > 0) {
     preparedSites.forEach((site) => {
       const siteKeys = Object.keys(site).filter((k) => k !== "org_id")
@@ -370,7 +371,7 @@ WITH upserted_building AS (
   ) VALUES (
     ${buildingVals}
   )
-  ON CONFLICT (org_id, name) DO UPDATE SET
+  ON CONFLICT (site_id, name) DO UPDATE SET
   ${buildingUpdateSet}
   RETURNING id
 ), building_map AS (
@@ -409,7 +410,7 @@ WITH upserted_floor AS (
   ) VALUES (
     ${floorVals}
   )
-  ON CONFLICT (org_id, name) DO UPDATE SET
+  ON CONFLICT (building_id, name) DO UPDATE SET
   ${floorUpdateSet}
   RETURNING id
 ), floor_map AS (
@@ -425,7 +426,13 @@ SELECT * FROM floor_map;
 
   if (config.devices.length > 0) {
     config.devices.forEach((device) => {
-      const deviceKeys = Object.keys(device).filter((k) => k !== "org_id" && k !== "site_id" && k !== "floor_id")
+      if (!device.site_id && !device.floor_id) {
+        throw new Error(`Device "${device.name}" must have either site_id or floor_id to satisfy database constraint`)
+      }
+
+      const deviceKeys = Object.keys(device).filter(
+        (k) => k !== "org_id" && k !== "site_id" && k !== "floor_id" && k !== "lock_id",
+      )
       const deviceCols = ["org_id", "site_id", "floor_id", ...deviceKeys].join(",\n  ")
       const deviceVals = [
         "(SELECT * FROM org_id_var)",
@@ -433,21 +440,16 @@ SELECT * FROM floor_map;
           ? `(SELECT actual_id FROM site_id_map WHERE config_id = ${formatValue(device.site_id)}::uuid)`
           : "NULL",
         device.floor_id
-          ? `(SELECT actual_id FROM floor_id_map WHERE config_id = ${formatValue(device.floor_id)}::uuid)`
+          ? `(SELECT id FROM floor_id_map WHERE config_id = ${formatValue(device.floor_id)}::uuid)`
           : "NULL",
         ...deviceKeys.map((k) => formatValue(device[k])),
       ].join(", ")
+
       const deviceUpdateCols = deviceKeys.filter((c) => c !== "id" && c !== "slug")
       const deviceUpdateSet =
         deviceUpdateCols.length > 0
           ? deviceUpdateCols.map((col) => `  ${col} = EXCLUDED.${col}`).join(",\n")
           : "  updated_at = NOW()"
-
-      // Serial numbers are globally unique hardware identifiers
-      const hasSerial = device.serial && device.serial !== null && device.serial !== ""
-      const conflictClause = hasSerial
-        ? `ON CONFLICT (lower(serial)) WHERE serial IS NOT NULL DO UPDATE SET`
-        : `ON CONFLICT (site_id, slug) DO UPDATE SET`
 
       output += `-- Insert/Update device: ${device.name}
 INSERT INTO core.devices (
@@ -455,7 +457,7 @@ INSERT INTO core.devices (
 ) VALUES (
   ${deviceVals}
 )
-${conflictClause}
+ON CONFLICT (slug) DO UPDATE SET
 ${deviceUpdateSet};
 
 `
@@ -481,7 +483,7 @@ WHERE d.org_id = (SELECT * FROM org_id_var)
 `
   }
 
-  const preparedPassTypes = config.passTypes.map((passType) =>
+  const preparedPassTypes = (config.passTypes || []).map((passType) =>
     preparePassTypeForDB(passType as unknown as Record<string, unknown>),
   )
   if (preparedPassTypes.length > 0) {
@@ -552,6 +554,64 @@ ON CONFLICT (org_id, module_key, site_id) DO UPDATE SET
 `
   }
 
+  // This ensures QR codes generate proper URLs with org/site/device slugs
+  const devicesWithSlugs = (config.devices || []).filter((device) => device.slug && config.organisation.slug)
+
+  if (devicesWithSlugs.length > 0) {
+    output += `-- ============================================
+-- ACCESSPOINT SLUGS (for QR code URL generation)
+-- ============================================
+-- These entries enable the QR system to generate proper URLs like:
+-- https://zezamii-pass.vercel.app/p/{org_slug}/{site_slug}/{device_slug}
+
+`
+    devicesWithSlugs.forEach((device) => {
+      // Find the site for this device to get site_slug
+      const deviceSite = (config.sites || []).find((s) => s.id === device.site_id)
+      // Generate site_slug from site name if not already set
+      const siteSlug = deviceSite?.name
+        ? deviceSite.name
+            .toLowerCase()
+            .replace(/\s+/g, "-")
+            .replace(/[^a-z0-9-]/g, "")
+        : "default"
+      const orgSlug = config.organisation.slug
+      const deviceSlug = device.slug
+      const fullSlug = `${orgSlug}/${siteSlug}/${deviceSlug}`
+
+      output += `-- Accesspoint slug for device: ${device.name}
+INSERT INTO pass.accesspoint_slugs (
+  slug,
+  org_slug,
+  site_slug,
+  accesspoint_slug,
+  org_id,
+  site_id,
+  device_id,
+  is_active
+) VALUES (
+  ${formatValue(fullSlug)},
+  ${formatValue(orgSlug)},
+  ${formatValue(siteSlug)},
+  ${formatValue(deviceSlug)},
+  (SELECT * FROM org_id_var),
+  (SELECT id FROM site_id_map WHERE config_id = ${formatValue(device.site_id)}::uuid),
+  (SELECT id FROM device_id_map WHERE config_id = ${formatValue(device.id)}::uuid),
+  true
+)
+ON CONFLICT (slug) DO UPDATE SET
+  org_slug = EXCLUDED.org_slug,
+  site_slug = EXCLUDED.site_slug,
+  accesspoint_slug = EXCLUDED.accesspoint_slug,
+  site_id = EXCLUDED.site_id,
+  device_id = EXCLUDED.device_id,
+  is_active = EXCLUDED.is_active,
+  updated_at = NOW();
+
+`
+    })
+  }
+
   if (config.accesspointSlugs && config.accesspointSlugs.length > 0) {
     output += `-- Update devices with slug information (from legacy accesspointSlugs)\n`
     config.accesspointSlugs.forEach((slug) => {
@@ -613,13 +673,13 @@ export function validateRelationships(config: TenantConfig): {
   const errors: string[] = []
 
   const orgId = config.organisation.id
-  config.sites.forEach((site, idx) => {
+  ;(config.sites || []).forEach((site, idx) => {
     if (site.org_id !== orgId) {
       errors.push(`Site ${idx} (${site.name}) references wrong org_id: ${site.org_id}`)
     }
   })
 
-  const siteIds = new Set(config.sites.map((s) => s.id))
+  const siteIds = new Set((config.sites || []).map((s) => s.id))
   ;(config.buildings || []).forEach((building, idx) => {
     if (!siteIds.has(building.site_id)) {
       errors.push(`Building ${idx} (${building.name}) references non-existent site_id: ${building.site_id}`)
@@ -640,7 +700,7 @@ export function validateRelationships(config: TenantConfig): {
 
   // Only validate floor_id references if floors exist
   if (floorIds.size > 0) {
-    config.devices.forEach((device, idx) => {
+    ;(config.devices || []).forEach((device, idx) => {
       if (!floorIds.has(device.floor_id)) {
         errors.push(`Device ${idx} (${device.name}) references non-existent floor_id: ${device.floor_id}`)
       }
@@ -651,7 +711,7 @@ export function validateRelationships(config: TenantConfig): {
   }
 
   const passTypeCodes = new Set<string>()
-  config.passTypes.forEach((passType, idx) => {
+  ;(config.passTypes || []).forEach((passType, idx) => {
     if (passType.org_id !== orgId) {
       errors.push(`Pass type ${idx} (${passType.name}) references wrong org_id: ${passType.org_id}`)
     }
@@ -661,13 +721,13 @@ export function validateRelationships(config: TenantConfig): {
     passTypeCodes.add(passType.code)
   })
 
-  const deviceSlugs = config.devices.filter((d) => d.slug).map((d) => d.slug)
+  const deviceSlugs = (config.devices || []).filter((d) => d.slug).map((d) => d.slug)
   const duplicateDeviceSlugs = deviceSlugs.filter((slug, idx) => deviceSlugs.indexOf(slug) !== idx)
   if (duplicateDeviceSlugs.length > 0) {
     errors.push(`Duplicate device slugs found: ${duplicateDeviceSlugs.join(", ")}`)
   }
 
-  const deviceIds = new Set(config.devices.map((d) => d.id))
+  const deviceIds = new Set((config.devices || []).map((d) => d.id))
   ;(config.accesspointSlugs || []).forEach((slug, idx) => {
     if (!deviceIds.has(slug.device_id)) {
       errors.push(`Access point slug ${idx} (${slug.slug}) references non-existent device_id: ${slug.device_id}`)

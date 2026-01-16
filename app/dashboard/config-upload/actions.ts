@@ -130,7 +130,9 @@ export async function validateConfiguration(jsonInput: string): Promise<Validati
     const result = tenantConfigSchema.safeParse(parsed)
 
     if (!result.success) {
-      const errors = result.error.errors.map((err) => `${err.path.join(".")}: ${err.message}`)
+      const errors = result.error?.errors?.map((err) => `${err.path.join(".")}: ${err.message}`) || [
+        "Schema validation failed",
+      ]
       return {
         success: false,
         errors,
