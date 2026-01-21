@@ -51,7 +51,7 @@ interface DeviceWithPasses {
 
 interface QRGeneratorClientProps {
   devices: DeviceWithPasses[]
-  sites: { id: string; name: string }[]
+  sites?: { id: string; name: string }[]
 }
 
 export function QRGeneratorClient({ devices, sites }: QRGeneratorClientProps) {
@@ -104,7 +104,7 @@ export function QRGeneratorClient({ devices, sites }: QRGeneratorClientProps) {
     }
   }
 
-  const selectedSite = safeSites.find((s) => s.id === selectedSiteId)
+  const _selectedSite = safeSites.find((s) => s.id === selectedSiteId)
 
   const generateQRCode = (pass: QRPass) => {
     const qr = new QRCodeStyling({
@@ -112,7 +112,9 @@ export function QRGeneratorClient({ devices, sites }: QRGeneratorClientProps) {
       height: qrSettings.size,
       type: "svg",
       data: pass.qr_url || "",
-      errorCorrectionLevel: qrSettings.errorCorrection,
+      qrOptions: {
+        errorCorrectionLevel: qrSettings.errorCorrection,
+      },
       margin: 5,
       dotsOptions: {
         color: "#000000", // Changed from blue (#4285F4) to black
@@ -120,9 +122,12 @@ export function QRGeneratorClient({ devices, sites }: QRGeneratorClientProps) {
       backgroundOptions: {
         color: "#FFFFFF",
       },
-      logo: qrSettings.includeLogo ? "path/to/logo.png" : undefined,
-      logoWidth: 50,
-      logoHeight: 50,
+      image: qrSettings.includeLogo ? "path/to/logo.png" : undefined,
+      imageOptions: {
+        hideBackgroundDots: true,
+        imageSize: 0.4,
+        margin: 5,
+      },
     })
     setQRCode(qr)
   }
@@ -131,6 +136,7 @@ export function QRGeneratorClient({ devices, sites }: QRGeneratorClientProps) {
     if (selectedPass) {
       generateQRCode(selectedPass)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPass, qrSettings])
 
   useEffect(() => {
@@ -150,7 +156,7 @@ export function QRGeneratorClient({ devices, sites }: QRGeneratorClientProps) {
           <div className="space-y-3">
             <div>
               <label htmlFor="search">Search</label>
-              <Input id="search" placeholder="Device name or slug..." value="" onChange={(e) => {}} />
+              <Input id="search" placeholder="Device name or slug..." value="" onChange={() => {}} />
             </div>
 
             <div>

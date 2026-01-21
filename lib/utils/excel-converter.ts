@@ -147,7 +147,7 @@ export function jsonToExcelData(config: TenantConfig): { [sheetName: string]: Ex
   sheets["Devices"] = config.devices.map((device) => ({
     id: device.id,
     org_id: device.org_id,
-    floor_id: device.floor_id,
+    floor_id: device.floor_id ?? null,
     name: device.name,
     slug: device.slug || "",
     slug_is_active: device.slug_is_active !== false,
@@ -497,7 +497,7 @@ export function excelDataToJson(sheets: { [sheetName: string]: ExcelRow[] }): Te
 
     // If no floors provided but buildings exist, create default "Ground" floor for each building
     if (config.floors.length === 0 && config.buildings && config.buildings.length > 0) {
-      config.floors = config.buildings.map((building, index) => ({
+      config.floors = config.buildings.map((building: { id: string; name: string }) => ({
         id: generateId(),
         building_id: building.id,
         name: "Ground",
@@ -535,7 +535,7 @@ export function excelDataToJson(sheets: { [sheetName: string]: ExcelRow[] }): Te
       name: row.name,
       code: row.code,
       description: row.description || undefined,
-      duration_minutes: Number(row.duration_minutes || row.duration_hours * 60 || 0),
+      duration_minutes: Number(row.duration_minutes || (row.duration_hours ? Number(row.duration_hours) * 60 : 0)),
       price_cents: Number(row.price_cents),
       stripe_product_id: row.stripe_product_id || null,
       stripe_price_id: row.stripe_price_id || null,

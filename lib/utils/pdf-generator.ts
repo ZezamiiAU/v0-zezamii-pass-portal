@@ -16,7 +16,7 @@ export interface PrintablePDFOptions {
  * Generate printable PDF with QR code
  */
 export async function generatePrintablePDF(options: PrintablePDFOptions): Promise<Blob> {
-  const { qrDataUrl, deviceName, locationPath, slug, orgSlug, fullUrl, orgName, supportEmail, size = "a4" } = options
+  const { qrDataUrl, deviceName, locationPath, slug: _slug, orgSlug, fullUrl, orgName, supportEmail, size = "a4" } = options
 
   const pdf = new jsPDF({
     orientation: "portrait",
@@ -25,7 +25,7 @@ export async function generatePrintablePDF(options: PrintablePDFOptions): Promis
   })
 
   const pageWidth = pdf.internal.pageSize.getWidth()
-  const pageHeight = pdf.internal.pageSize.getHeight()
+  const _pageHeight = pdf.internal.pageSize.getHeight()
   const margin = 20
 
   let yPos = margin

@@ -5,7 +5,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 
 export default async function DashboardPage() {
-  const supabase = await createClient()
+  const _supabase = await createClient()
 
   // Stats display removed until we have a working solution
 

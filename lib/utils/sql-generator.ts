@@ -233,8 +233,8 @@ function prepareIntegrationForDB(integration: Record<string, unknown>): Record<s
   return dbIntegration
 }
 
-// Generate INSERT statement with UPSERT capability
-function generateInsert(
+// Generate INSERT statement with UPSERT capability (reserved for future use)
+function _generateInsert(
   tableName: string,
   schemaName: string,
   rows: Record<string, unknown>[],
@@ -427,23 +427,25 @@ SELECT * FROM floor_map;
 
   if (config.devices.length > 0) {
     config.devices.forEach((device) => {
-      if (!device.site_id && !device.floor_id) {
+      const deviceRecord = device as unknown as Record<string, unknown>
+
+      if (!deviceRecord.site_id && !device.floor_id) {
         throw new Error(`Device "${device.name}" must have either site_id or floor_id to satisfy database constraint`)
       }
 
-      const deviceKeys = Object.keys(device).filter(
+      const deviceKeys = Object.keys(deviceRecord).filter(
         (k) => k !== "org_id" && k !== "site_id" && k !== "floor_id" && k !== "lock_id",
       )
       const deviceCols = ["org_id", "site_id", "floor_id", ...deviceKeys].join(",\n  ")
       const deviceVals = [
         "(SELECT * FROM org_id_var)",
-        device.site_id
-          ? `(SELECT actual_id FROM site_id_map WHERE config_id = ${formatValue(device.site_id)}::uuid)`
+        deviceRecord.site_id
+          ? `(SELECT id FROM site_id_map WHERE config_id = ${formatValue(deviceRecord.site_id)}::uuid)`
           : "NULL",
         device.floor_id
           ? `(SELECT id FROM floor_id_map WHERE config_id = ${formatValue(device.floor_id)}::uuid)`
           : "NULL",
-        ...deviceKeys.map((k) => formatValue(device[k])),
+        ...deviceKeys.map((k) => formatValue(deviceRecord[k])),
       ].join(", ")
 
       const deviceUpdateCols = deviceKeys.filter((c) => c !== "id" && c !== "slug")
@@ -567,8 +569,9 @@ ON CONFLICT (org_id, module_key, site_id) DO UPDATE SET
 
 `
     devicesWithSlugs.forEach((device) => {
+      const deviceRecord = device as unknown as Record<string, unknown>
       // Find the site for this device to get site_slug
-      const deviceSite = (config.sites || []).find((s) => s.id === device.site_id)
+      const deviceSite = (config.sites || []).find((s) => s.id === deviceRecord.site_id)
       // Generate site_slug from site name if not already set
       const siteSlug = deviceSite?.name
         ? deviceSite.name
@@ -596,7 +599,7 @@ INSERT INTO pass.accesspoint_slugs (
   ${formatValue(siteSlug)},
   ${formatValue(deviceSlug)},
   (SELECT * FROM org_id_var),
-  (SELECT id FROM site_id_map WHERE config_id = ${formatValue(device.site_id)}::uuid),
+  (SELECT id FROM site_id_map WHERE config_id = ${formatValue(deviceRecord.site_id)}::uuid),
   (SELECT id FROM device_id_map WHERE config_id = ${formatValue(device.id)}::uuid),
   true
 )
@@ -702,7 +705,7 @@ export function validateRelationships(config: TenantConfig): {
   // Only validate floor_id references if floors exist
   if (floorIds.size > 0) {
     ;(config.devices || []).forEach((device, idx) => {
-      if (!floorIds.has(device.floor_id)) {
+      if (device.floor_id && !floorIds.has(device.floor_id)) {
         errors.push(`Device ${idx} (${device.name}) references non-existent floor_id: ${device.floor_id}`)
       }
       if (device.org_id !== orgId) {
@@ -742,14 +745,13 @@ export function validateRelationships(config: TenantConfig): {
   }
 
   // Validate integrations
-  const integrationOrgIds = new Set<string>()
   ;(config.integrations || []).forEach((integration, idx) => {
-    if (integration.organisation_id !== orgId) {
+    const integrationOrgId = integration.organisation_id || integration.org_id
+    if (integrationOrgId && integrationOrgId !== orgId) {
       errors.push(
-        `Integration ${idx} (${integration.name}) references wrong organisation_id: ${integration.organisation_id}`,
+        `Integration ${idx} (${integration.name}) references wrong organisation_id: ${integrationOrgId}`,
       )
     }
-    integrationOrgIds.add(integration.organisation_id)
   })
 
   return {

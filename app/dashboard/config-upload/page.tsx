@@ -494,7 +494,7 @@ export default function ConfigUploadPage() {
       })
   }
 
-  const handleClearValidation = () => {
+  const _handleClearValidation = () => {
     setValidationResult(null)
     setValidatedConfig(null)
     setValidationErrors([])
