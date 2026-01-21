@@ -311,10 +311,6 @@ export function excelDataToJson(sheets: { [sheetName: string]: ExcelRow[] }): Te
 
     // Parse Devices sheet and match to floors by name
     config.devices = (normalizedSheets["Devices"] || []).map((row) => {
-      console.log("[v0] Device row keys:", Object.keys(row))
-      console.log("[v0] Device row:", JSON.stringify(row))
-      console.log("[v0] Available sites in map:", Array.from(siteIdMap.entries()))
-
       const locationName = (row.parent_location_name ||
         row.parent_location ||
         row.parentlocation ||
@@ -325,8 +321,6 @@ export function excelDataToJson(sheets: { [sheetName: string]: ExcelRow[] }): Te
         row.site ||
         "") as string
 
-      console.log("[v0] Location name found:", locationName)
-
       // Case-insensitive lookup - try to find in floor map first, then site map
       const locationLower = locationName.toLowerCase().trim()
       let floorId: string | undefined
@@ -336,7 +330,6 @@ export function excelDataToJson(sheets: { [sheetName: string]: ExcelRow[] }): Te
       for (const [key, value] of floorIdMap.entries()) {
         if (key.toLowerCase().trim() === locationLower) {
           floorId = value
-          console.log("[v0] Found floor match:", key, "->", value)
           break
         }
       }
@@ -346,13 +339,10 @@ export function excelDataToJson(sheets: { [sheetName: string]: ExcelRow[] }): Te
         for (const [key, value] of siteIdMap.entries()) {
           if (key.toLowerCase().trim() === locationLower) {
             siteId = value
-            console.log("[v0] Found site match:", key, "->", value)
             break
           }
         }
       }
-
-      console.log("[v0] Final result - siteId:", siteId, "floorId:", floorId)
 
       return {
         id: generateId(),

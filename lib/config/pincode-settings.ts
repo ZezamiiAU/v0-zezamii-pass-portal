@@ -11,12 +11,13 @@ export const PINCODE_CONSTRAINTS = {
   DEFAULT_LENGTH: 6,
 } as const
 
-export type PincodeLength = 4 | 5 | 6 | 7 | 8
+// Valid pincode lengths: 4, 5, 6, 7, or 8
+export type PincodeLength = number
 
 /**
  * Validates that a pincode length is within acceptable bounds
  */
-export function isValidPincodeLength(length: number): length is PincodeLength {
+export function isValidPincodeLength(length: number): boolean {
   return (
     Number.isInteger(length) && length >= PINCODE_CONSTRAINTS.MIN_LENGTH && length <= PINCODE_CONSTRAINTS.MAX_LENGTH
   )

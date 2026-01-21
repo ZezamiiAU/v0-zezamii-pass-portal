@@ -34,6 +34,11 @@ export async function updateSession(request: NextRequest) {
     },
   )
 
+  // Skip auth check for webhook endpoints (they use their own auth via Authorization header)
+  if (request.nextUrl.pathname.startsWith("/api/webhooks")) {
+    return supabaseResponse
+  }
+
   const {
     data: { user },
   } = await supabase.auth.getUser()
