@@ -37,6 +37,7 @@ function prepareOrganisationForDB(org: Record<string, unknown>): Record<string, 
     "default_partner_org_id",
     "default_partner_tier",
     "agent_settings",
+    "zezamii_property_id",
   ]
 
   // Copy valid fields directly
@@ -562,7 +563,7 @@ ON CONFLICT (org_id, module_key, site_id) DO UPDATE SET
 -- ACCESSPOINT SLUGS (for QR code URL generation)
 -- ============================================
 -- These entries enable the QR system to generate proper URLs like:
--- https://zezamii-pass.vercel.app/p/{org_slug}/{site_slug}/{device_slug}
+-- {NEXT_PUBLIC_PWA_BASE_URL}/p/{org_slug}/{site_slug}/{device_slug}
 
 `
     devicesWithSlugs.forEach((device) => {

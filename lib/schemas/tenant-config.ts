@@ -47,6 +47,7 @@ export const organisationSchema = z.object({
   postal_code: z.string().optional(),
   is_active: z.boolean().default(true),
   stripe_account_id: z.string().nullable().optional(),
+  zezamii_property_id: z.string().nullable().optional(), // Zezamii Cloud property ID for event API
   notes: z.string().optional(),
 })
 
@@ -128,6 +129,7 @@ export const deviceSchema = z.object({
   custom_name: z.string().optional(),
   custom_description: z.string().optional(),
   custom_logo_url: z.string().url().nullable().optional(),
+  zezamii_room_id: z.string().nullable().optional(), // Zezamii Cloud room ID for access point mapping
 })
 
 // Access point slug schema (if exists in actual DB)

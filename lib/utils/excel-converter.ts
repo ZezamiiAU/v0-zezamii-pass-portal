@@ -139,6 +139,7 @@ export function jsonToExcelData(config: TenantConfig): { [sheetName: string]: Ex
       primary_color: config.organisation.primary_color || "",
       secondary_color: config.organisation.secondary_color || "",
       stripe_account_id: config.organisation.stripe_account_id || "",
+      zezamii_property_id: config.organisation.zezamii_property_id || "",
     },
   ]
 
@@ -158,6 +159,7 @@ export function jsonToExcelData(config: TenantConfig): { [sheetName: string]: Ex
     custom_name: device.custom_name || "",
     custom_description: device.custom_description || "",
     custom_logo_url: device.custom_logo_url || "",
+    zezamii_room_id: device.zezamii_room_id || "",
   }))
 
   // Sheet 5: Passes
@@ -234,6 +236,7 @@ export function excelDataToJson(sheets: { [sheetName: string]: ExcelRow[] }): Te
       timezone: orgRow.timezone,
       is_active: orgRow.is_active !== false,
       stripe_account_id: brandRow.stripe_account_id || null,
+      zezamii_property_id: orgRow.zezamii_property_id || brandRow.zezamii_property_id || null,
       notes: orgRow.notes || undefined,
     }
 
@@ -368,6 +371,7 @@ export function excelDataToJson(sheets: { [sheetName: string]: ExcelRow[] }): Te
         custom_name: row.custom_name || undefined,
         custom_description: row.custom_description || undefined,
         custom_logo_url: row.custom_logo_url || null,
+        zezamii_room_id: row.zezamii_room_id || null,
         rotation: 0,
       }
     })

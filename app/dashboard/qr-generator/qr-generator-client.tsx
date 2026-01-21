@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { Copy, Trash2, QrCode, MapPin, Hash, Lock } from "lucide-react"
 import { deleteQRPass } from "./actions"
+import { generatePassUrl } from "@/lib/config"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface QRPass {
@@ -333,7 +334,12 @@ export function QRGeneratorClient({ devices, sites }: QRGeneratorClientProps) {
                   return passes.map((pass) => {
                     const fullUrl =
                       pass.qr_url ||
-                      `https://zezamii-pass.vercel.app/p/${selectedDevice.org_slug}/${selectedDevice.site_slug}/${selectedDevice.device_slug}?qr=${pass.qr_instance_id}&source=qr`
+                      generatePassUrl(
+                        selectedDevice.org_slug || "",
+                        selectedDevice.site_slug || "",
+                        selectedDevice.device_slug || "",
+                        pass.qr_instance_id
+                      )
 
                     return (
                       <div
