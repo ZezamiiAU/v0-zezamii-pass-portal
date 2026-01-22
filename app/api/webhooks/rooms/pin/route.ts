@@ -129,14 +129,13 @@ export async function POST(request: Request) {
 
     const supabase = getSupabaseServiceClient()
 
-    // Check if lock_code already exists with the same PIN (idempotency check)
+    // Check if lock_code already exists for this pass (any provider)
     // Using pass.lock_codes schema
     const { data: existingCode } = await supabase
       .schema("pass")
       .from("lock_codes")
-      .select("id, code, status")
+      .select("id, code, status, provider")
       .eq("pass_id", payload.reservationId)
-      .eq("provider", "rooms")
       .maybeSingle()
 
     // If PIN already matches and status is active, skip update (idempotent)
@@ -159,13 +158,15 @@ export async function POST(request: Request) {
     // Update or insert lock_code
     // Note: starts_at/ends_at are nullable - validity dates come from passes.valid_from/valid_to
     if (existingCode) {
-      // Update existing lock_code
+      // Update existing lock_code (regardless of original provider)
       const { error: updateError } = await supabase
         .schema("pass")
         .from("lock_codes")
         .update({
           code: payload.pinCode,
           status: "active",
+          provider: "rooms", // Update provider to rooms
+          provider_ref: payload.reservationId,
         })
         .eq("id", existingCode.id)
 
@@ -270,7 +271,6 @@ export async function DELETE(request: Request) {
       .from("lock_codes")
       .select("id, status")
       .eq("pass_id", payload.reservationId)
-      .eq("provider", "rooms")
       .maybeSingle()
 
     // If already revoked, return success (idempotent)
