@@ -365,25 +365,80 @@ export async function DELETE(request: Request) {
   }
 }
 
-// Health check endpoint
-export async function GET() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "NOT_SET"
-  const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY
-  const hasWebhookSecret = !!process.env.ROOMS_WEBHOOK_SECRET
-  
-  // Extract project ID from URL for verification
-  const projectIdMatch = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/)
-  const projectId = projectIdMatch ? projectIdMatch[1] : "unknown"
-  
-  return NextResponse.json({
-    status: "ok",
-    endpoint: "Rooms PIN Webhook",
-    version: "1.0.0",
-    config: {
-      supabaseProject: projectId,
-      supabaseUrlSet: supabaseUrl !== "NOT_SET",
-      serviceKeySet: hasServiceKey,
-      webhookSecretSet: hasWebhookSecret,
-    },
-  })
+// GET endpoint - Health check or get PIN for reservation
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const reservationId = searchParams.get("reservationId")
+
+  // If no reservationId, return health check
+  if (!reservationId) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "NOT_SET"
+    const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY
+    const hasWebhookSecret = !!process.env.ROOMS_WEBHOOK_SECRET
+    
+    const projectIdMatch = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/)
+    const projectId = projectIdMatch ? projectIdMatch[1] : "unknown"
+    
+    return NextResponse.json({
+      status: "ok",
+      endpoint: "Rooms PIN Webhook",
+      version: "1.0.0",
+      config: {
+        supabaseProject: projectId,
+        supabaseUrlSet: supabaseUrl !== "NOT_SET",
+        serviceKeySet: hasServiceKey,
+        webhookSecretSet: hasWebhookSecret,
+      },
+    })
+  }
+
+  // Validate authorization for PIN lookup
+  if (!validateWebhookAuth(request)) {
+    return NextResponse.json(
+      { error: "Unauthorized", message: "Invalid or missing authorization" },
+      { status: 401 }
+    )
+  }
+
+  try {
+    const supabase = getSupabaseServiceClient()
+
+    // Get lock_code for the reservation
+    const { data: lockCode, error } = await supabase
+      .schema("pass")
+      .from("lock_codes")
+      .select("code, status, provider, created_at")
+      .eq("pass_id", reservationId)
+      .maybeSingle()
+
+    if (error) {
+      console.error("[Rooms Webhook] Error fetching lock_code:", error)
+      return NextResponse.json(
+        { error: "Database Error", message: "Failed to fetch PIN code" },
+        { status: 500 }
+      )
+    }
+
+    if (!lockCode) {
+      return NextResponse.json(
+        { error: "Not Found", message: "No PIN found for this reservation" },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      reservationId: reservationId,
+      pinCode: lockCode.code,
+      status: lockCode.status,
+      provider: lockCode.provider,
+      createdAt: lockCode.created_at,
+    })
+  } catch (error) {
+    console.error("[Rooms Webhook] Unexpected error:", error)
+    return NextResponse.json(
+      { error: "Internal Server Error", message: "An unexpected error occurred" },
+      { status: 500 }
+    )
+  }
 }
