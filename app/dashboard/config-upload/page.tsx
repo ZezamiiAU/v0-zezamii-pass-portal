@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import ExcelJS from "exceljs"
+import * as XLSX from "xlsx"
 
 import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -155,13 +155,9 @@ export default function ConfigUploadPage() {
     })
   }
 
-  const handleDownloadExcelTemplate = async () => {
-    // Create workbook using ExcelJS
-    const workbook = new ExcelJS.Workbook()
-
+  const handleDownloadExcelTemplate = () => {
     // Sheet 1: Organisation (including sites, buildings, floors)
-    const wsOrg = workbook.addWorksheet("Organisation")
-    wsOrg.addRows([
+    const orgData = [
       [
         "Type",
         "Parent_Name",
@@ -219,25 +215,22 @@ export default function ConfigUploadPage() {
         true,
         "Optional - will auto-generate if not provided",
       ],
-    ])
+    ]
 
     // Sheet 2: Contacts
-    const wsContacts = workbook.addWorksheet("Contacts")
-    wsContacts.addRows([
+    const contactsData = [
       ["Contact_Email", "Contact_Phone", "Support_Email", "Billing_Email"],
       ["contact@zezamii.com.au", "+61 7 3000 0000", "support@zezamii.com.au", "billing@zezamii.com.au"],
-    ])
+    ]
 
     // Sheet 3: Branding
-    const wsBranding = workbook.addWorksheet("Branding")
-    wsBranding.addRows([
+    const brandingData = [
       ["Logo_URL", "Primary_Color", "Secondary_Color", "Stripe_Account_ID"],
       ["https://example.com/logo.png", "#1a73e8", "#34a853", ""],
-    ])
+    ]
 
     // Sheet 4: Devices
-    const wsDevices = workbook.addWorksheet("Devices")
-    wsDevices.addRows([
+    const devicesData = [
       [
         "Floor_Name",
         "Name",
@@ -266,11 +259,10 @@ export default function ConfigUploadPage() {
         "Primary park entry point",
         "",
       ],
-    ])
+    ]
 
     // Sheet 5: Passes
-    const wsPasses = workbook.addWorksheet("Passes")
-    wsPasses.addRows([
+    const passesData = [
       [
         "Name",
         "Code",
@@ -283,11 +275,27 @@ export default function ConfigUploadPage() {
         "Notes",
       ],
       ["Day Pass", "DAY-PASS", "24-hour park access", 1440, 2400, "", 1, true, ""],
-    ])
+    ]
 
-    // Write to buffer and create blob
-    const buffer = await workbook.xlsx.writeBuffer()
-    const blob = new Blob([buffer], {
+    // Create workbook using XLSX library
+    const wb = XLSX.utils.book_new()
+
+    // Add sheets to workbook
+    const wsOrg = XLSX.utils.aoa_to_sheet(orgData)
+    const wsContacts = XLSX.utils.aoa_to_sheet(contactsData)
+    const wsBranding = XLSX.utils.aoa_to_sheet(brandingData)
+    const wsDevices = XLSX.utils.aoa_to_sheet(devicesData)
+    const wsPasses = XLSX.utils.aoa_to_sheet(passesData)
+
+    XLSX.utils.book_append_sheet(wb, wsOrg, "Organisation")
+    XLSX.utils.book_append_sheet(wb, wsContacts, "Contacts")
+    XLSX.utils.book_append_sheet(wb, wsBranding, "Branding")
+    XLSX.utils.book_append_sheet(wb, wsDevices, "Devices")
+    XLSX.utils.book_append_sheet(wb, wsPasses, "Passes")
+
+    // Write to binary string and create blob
+    const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" })
+    const blob = new Blob([wbout], {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     })
 
@@ -307,82 +315,73 @@ export default function ConfigUploadPage() {
     })
   }
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
 
     const isExcel = file.name.endsWith(".xlsx") || file.name.endsWith(".xls")
 
     if (isExcel) {
-      try {
-        const arrayBuffer = await file.arrayBuffer()
-        const workbook = new ExcelJS.Workbook()
-        await workbook.xlsx.load(arrayBuffer)
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer)
+          const workbook = XLSX.read(data, { type: "array" })
 
-        // Parse all sheets into a proper structure
-        const sheets: { [sheetName: string]: any[] } = {}
-        workbook.eachSheet((worksheet) => {
-          const sheetData: any[] = []
-          const headers: string[] = []
-
-          worksheet.eachRow((row, rowNumber) => {
-            const rowValues = row.values as any[]
-            // ExcelJS row.values is 1-indexed, so slice from index 1
-            const values = rowValues.slice(1)
-
-            if (rowNumber === 1) {
-              // First row is headers
-              values.forEach((val) => headers.push(String(val || "")))
-            } else {
-              // Data rows - convert to object using headers
-              const rowObj: any = {}
-              values.forEach((val, idx) => {
-                if (headers[idx]) {
-                  rowObj[headers[idx]] = val
-                }
-              })
-              sheetData.push(rowObj)
-            }
+          // Parse all sheets into a proper structure
+          const sheets: { [sheetName: string]: any[] } = {}
+          workbook.SheetNames.forEach((sheetName) => {
+            const sheet = workbook.Sheets[sheetName]
+            sheets[sheetName] = XLSX.utils.sheet_to_json(sheet)
           })
 
-          sheets[worksheet.name] = sheetData
-        })
+          // Convert Excel data to proper TenantConfig JSON structure
+          const tenantConfig = excelDataToJson(sheets)
 
-        // Convert Excel data to proper TenantConfig JSON structure
-        const tenantConfig = excelDataToJson(sheets)
+          // Format and set the JSON input
+          const formattedJSON = JSON.stringify(tenantConfig, null, 2)
+          setJsonInput(formattedJSON)
 
-        // Format and set the JSON input
-        const formattedJSON = JSON.stringify(tenantConfig, null, 2)
-        setJsonInput(formattedJSON)
-
+          toast({
+            title: "Excel File Loaded",
+            description: `${file.name} has been converted to JSON successfully`,
+          })
+        } catch (error) {
+          console.error("[v0] Excel parse error:", error)
+          toast({
+            title: "Excel Parse Error",
+            description: `Failed to parse Excel file: ${error instanceof Error ? error.message : "Unknown error"}`,
+            variant: "destructive",
+          })
+        }
+      }
+      reader.onerror = () => {
         toast({
-          title: "Excel File Loaded",
-          description: `${file.name} has been converted to JSON successfully`,
-        })
-      } catch (error) {
-        console.error("[v0] Excel parse error:", error)
-        toast({
-          title: "Excel Parse Error",
-          description: `Failed to parse Excel file: ${error instanceof Error ? error.message : "Unknown error"}`,
+          title: "File Read Error",
+          description: "Failed to read the Excel file. Please try again.",
           variant: "destructive",
         })
       }
+      reader.readAsArrayBuffer(file)
     } else {
       // For JSON files, read as text with UTF-8 encoding
-      try {
-        const content = await file.text()
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const content = e.target?.result as string
         setJsonInput(content)
         toast({
           title: "File Loaded",
           description: `${file.name} has been loaded successfully`,
         })
-      } catch (error) {
+      }
+      reader.onerror = () => {
         toast({
           title: "File Read Error",
           description: "Failed to read the file. Please try again.",
           variant: "destructive",
         })
       }
+      reader.readAsText(file, "UTF-8")
     }
 
     // Clear the file input to allow re-uploading the same file
