@@ -11,7 +11,7 @@ interface RoomsPinWebhookPayload {
   validUntil?: string // ISO timestamp
   roomId?: string // Zezamii room ID
   status?: string // active, revoked, or pending
-  
+
   // Nested event format (from Rooms PRD)
   event?: string // pin.created
   timestamp?: string
@@ -49,7 +49,7 @@ function normalizePayload(payload: RoomsPinWebhookPayload): NormalizedPayload | 
       status: "active",
     }
   }
-  
+
   // Flat format
   if (payload.reservationId && payload.pinCode) {
     return {
@@ -61,7 +61,7 @@ function normalizePayload(payload: RoomsPinWebhookPayload): NormalizedPayload | 
       status: payload.status || "active",
     }
   }
-  
+
   return null
 }
 
@@ -112,7 +112,7 @@ export async function POST(request: Request) {
 
     // Parse request body
     const rawPayload: RoomsPinWebhookPayload = await request.json()
-    
+
     // Normalize payload (supports both flat and nested formats)
     const payload = normalizePayload(rawPayload)
 
@@ -129,21 +129,21 @@ export async function POST(request: Request) {
 
     const supabase = getSupabaseServiceClient()
 
-    // Check if lock_code already exists with the same PIN (idempotency check)
-    // Using pass.lock_codes schema
+    // Check if lock_code already exists for this pass (ANY provider)
+    // We need to find existing records regardless of provider so we can update them
     const { data: existingCode } = await supabase
       .schema("pass")
       .from("lock_codes")
-      .select("id, code, status")
+      .select("id, code, status, provider")
       .eq("pass_id", payload.reservationId)
-      .eq("provider", "rooms")
       .maybeSingle()
 
-    // If PIN already matches and status is active, skip update (idempotent)
+    // If PIN already matches and status is active and provider is rooms, skip update (idempotent)
     if (
       existingCode &&
       existingCode.code === payload.pinCode &&
-      existingCode.status === "active"
+      existingCode.status === "active" &&
+      existingCode.provider === "rooms"
     ) {
       console.log(
         `[Rooms Webhook] Idempotent: PIN already set for pass ${payload.reservationId}`
@@ -158,17 +158,21 @@ export async function POST(request: Request) {
 
     // Update or insert lock_code
     if (existingCode) {
-      // Update existing lock_code
-      const { error: updateError } = await supabase
+      // Update existing lock_code (regardless of previous provider - could be "backup")
+      const { data: updatedCode, error: updateError } = await supabase
         .schema("pass")
         .from("lock_codes")
         .update({
           code: payload.pinCode,
           status: "active",
+          provider: "rooms",
+          provider_ref: payload.reservationId,
           starts_at: payload.validFrom || null,
           ends_at: payload.validUntil || null,
         })
         .eq("id", existingCode.id)
+        .select()
+        .single()
 
       if (updateError) {
         console.error("[Rooms Webhook] Error updating lock_codes:", updateError)
@@ -177,6 +181,18 @@ export async function POST(request: Request) {
           { status: 500 }
         )
       }
+
+      if (!updatedCode) {
+        console.error("[Rooms Webhook] Update returned no data - possible RLS issue")
+        return NextResponse.json(
+          { error: "Database Error", message: "Update failed - no rows affected" },
+          { status: 500 }
+        )
+      }
+
+      console.log(
+        `[Rooms Webhook] Updated lock_code for pass ${payload.reservationId}: provider ${existingCode.provider} -> rooms, code: ${updatedCode.code}`
+      )
     } else {
       // Insert new lock_code (in case webhook arrives before PWA created pending record)
       const { error: insertError } = await supabase
@@ -193,15 +209,16 @@ export async function POST(request: Request) {
         })
 
       if (insertError) {
-        // Could be duplicate - check if it's a unique constraint violation
-        if (insertError.code !== "23505") {
-          console.error("[Rooms Webhook] Error inserting lock_code:", insertError)
-          return NextResponse.json(
-            { error: "Database Error", message: "Failed to store PIN code" },
-            { status: 500 }
-          )
-        }
+        console.error("[Rooms Webhook] Error inserting lock_code:", insertError)
+        return NextResponse.json(
+          { error: "Database Error", message: "Failed to store PIN code" },
+          { status: 500 }
+        )
       }
+
+      console.log(
+        `[Rooms Webhook] Inserted new lock_code for pass ${payload.reservationId}`
+      )
     }
 
     // Also update the pass status to active if it was pending
@@ -267,7 +284,7 @@ export async function DELETE(request: Request) {
     const reason = payload.reason || "user_cancelled"
 
     // Check current status for idempotency
-    // Using pass.lock_codes schema
+    // Using pass.lock_codes schema - query by pass_id and provider=rooms
     const { data: existingCode } = await supabase
       .schema("pass")
       .from("lock_codes")
@@ -373,11 +390,11 @@ export async function GET() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "NOT_SET"
   const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY
   const hasWebhookSecret = !!process.env.ROOMS_WEBHOOK_SECRET
-  
+
   // Extract project ID from URL for verification
   const projectIdMatch = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/)
   const projectId = projectIdMatch ? projectIdMatch[1] : "unknown"
-  
+
   return NextResponse.json({
     status: "ok",
     endpoint: "Rooms PIN Webhook",
