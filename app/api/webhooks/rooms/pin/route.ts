@@ -157,6 +157,7 @@ export async function POST(request: Request) {
     }
 
     // Update or insert lock_code
+    // Note: starts_at/ends_at are nullable - validity dates come from passes.valid_from/valid_to
     if (existingCode) {
       // Update existing lock_code
       const { error: updateError } = await supabase
@@ -165,8 +166,6 @@ export async function POST(request: Request) {
         .update({
           code: payload.pinCode,
           status: "active",
-          starts_at: payload.validFrom || null,
-          ends_at: payload.validUntil || null,
         })
         .eq("id", existingCode.id)
 
@@ -188,8 +187,6 @@ export async function POST(request: Request) {
           status: "active",
           provider: "rooms",
           provider_ref: payload.reservationId,
-          starts_at: payload.validFrom || null,
-          ends_at: payload.validUntil || null,
         })
 
       if (insertError) {
