@@ -77,6 +77,65 @@ function getSupabaseServiceClient() {
   return createClient(supabaseUrl, supabaseServiceKey)
 }
 
+// Validate UUID format
+function isValidUUID(str: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  return uuidRegex.test(str)
+}
+
+// Validate reservationId (must be valid UUID and exist in passes table)
+async function validateReservationId(
+  supabase: ReturnType<typeof getSupabaseServiceClient>,
+  reservationId: string
+): Promise<{ valid: boolean; error?: string }> {
+  if (!reservationId) {
+    return { valid: false, error: "reservationId is required" }
+  }
+
+  // Check UUID format
+  if (!isValidUUID(reservationId)) {
+    return { valid: false, error: "reservationId must be a valid UUID" }
+  }
+
+  // Check if pass exists in database
+  const { data: pass, error } = await supabase
+    .schema("pass")
+    .from("passes")
+    .select("id, status")
+    .eq("id", reservationId)
+    .maybeSingle()
+
+  if (error) {
+    console.error("[Rooms Webhook] Error checking pass:", error)
+    return { valid: false, error: "Failed to validate reservationId" }
+  }
+
+  if (!pass) {
+    return { valid: false, error: "reservationId not found - pass does not exist" }
+  }
+
+  return { valid: true }
+}
+
+// Validate PIN code format (4-8 digits only, no letters)
+function validatePinCode(pinCode: string): { valid: boolean; error?: string } {
+  if (!pinCode) {
+    return { valid: false, error: "pinCode is required" }
+  }
+  
+  // Must be digits only
+  if (!/^\d+$/.test(pinCode)) {
+    return { valid: false, error: "pinCode must contain only digits (0-9)" }
+  }
+  
+  // Must be 4-8 digits
+  if (pinCode.length < 4 || pinCode.length > 8) {
+    return { valid: false, error: "pinCode must be 4 to 8 digits" }
+  }
+  
+  return { valid: true }
+}
+
 // Validate webhook authorization
 function validateWebhookAuth(request: Request): boolean {
   const authHeader = request.headers.get("authorization")
@@ -127,7 +186,31 @@ export async function POST(request: Request) {
       )
     }
 
+    // Validate PIN code format (4-8 digits only)
+    const pinValidation = validatePinCode(payload.pinCode)
+    if (!pinValidation.valid) {
+      return NextResponse.json(
+        {
+          error: "Bad Request",
+          message: pinValidation.error,
+        },
+        { status: 400 }
+      )
+    }
+
     const supabase = getSupabaseServiceClient()
+
+    // Validate reservationId (must be valid UUID and exist in database)
+    const reservationValidation = await validateReservationId(supabase, payload.reservationId)
+    if (!reservationValidation.valid) {
+      return NextResponse.json(
+        {
+          error: "Bad Request",
+          message: reservationValidation.error,
+        },
+        { status: 400 }
+      )
+    }
 
     // Check if lock_code already exists for this pass (any provider)
     // Using pass.lock_codes schema
@@ -257,6 +340,14 @@ export async function DELETE(request: Request) {
     if (!payload.reservationId) {
       return NextResponse.json(
         { error: "Bad Request", message: "reservationId is required" },
+        { status: 400 }
+      )
+    }
+
+    // Validate UUID format
+    if (!isValidUUID(payload.reservationId)) {
+      return NextResponse.json(
+        { error: "Bad Request", message: "reservationId must be a valid UUID" },
         { status: 400 }
       )
     }
@@ -397,6 +488,14 @@ export async function GET(request: Request) {
     return NextResponse.json(
       { error: "Unauthorized", message: "Invalid or missing authorization" },
       { status: 401 }
+    )
+  }
+
+  // Validate UUID format
+  if (!isValidUUID(reservationId)) {
+    return NextResponse.json(
+      { error: "Bad Request", message: "reservationId must be a valid UUID" },
+      { status: 400 }
     )
   }
 
