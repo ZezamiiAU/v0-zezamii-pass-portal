@@ -7,9 +7,8 @@ export const config = {
   /**
    * PWA Base URL
    * Used for generating pass URLs, QR codes, and deep links
-   * Can be changed from zezamii-pass.vercel.app to pass.zezamii.com
    */
-  pwaBaseUrl: process.env.NEXT_PUBLIC_PWA_BASE_URL || "https://zezamii-pass.vercel.app",
+  pwaBaseUrl: process.env.NEXT_PUBLIC_PWA_BASE_URL || "https://pass.zezamii.com",
 
   /**
    * Supabase Configuration

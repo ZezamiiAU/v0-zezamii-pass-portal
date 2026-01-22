@@ -8,7 +8,14 @@ export async function createClient() {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Supabase environment variables are not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.")
+    console.error("[v0] Supabase environment variables not configured")
+    // Return a mock client that will fail auth checks gracefully
+    return {
+      auth: {
+        getUser: async () => ({ data: { user: null }, error: new Error("Supabase not configured") }),
+        getSession: async () => ({ data: { session: null }, error: new Error("Supabase not configured") }),
+      },
+    } as ReturnType<typeof createServerClient>
   }
 
   return createServerClient(supabaseUrl, supabaseAnonKey, {

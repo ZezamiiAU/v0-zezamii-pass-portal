@@ -14,14 +14,18 @@ export default async function DashboardLayout({
     const supabase = await createClient()
     const { data, error } = await supabase.auth.getUser()
     
-    if (error || !data.user) {
+    if (error) {
+      console.error("[v0] Dashboard auth error:", error.message)
+    }
+    
+    if (!data?.user) {
       redirect("/auth/login")
     }
     
     user = data.user
   } catch (err) {
-    // Handle connection errors gracefully
-    console.error("Auth error:", err)
+    // Handle connection errors gracefully - redirect to login, not error page
+    console.error("[v0] Dashboard layout error:", err)
     redirect("/auth/login")
   }
 

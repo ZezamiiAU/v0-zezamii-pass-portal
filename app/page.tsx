@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 
-// Redirect directly to the public request pass page
+// Redirect to dashboard (middleware will redirect to login if not authenticated)
 export default function HomePage() {
-  redirect("/request-pass")
+  redirect("/dashboard")
 }

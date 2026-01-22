@@ -106,12 +106,22 @@ export function QRGeneratorClient({ devices, sites }: QRGeneratorClientProps) {
 
   const _selectedSite = safeSites.find((s) => s.id === selectedSiteId)
 
-  const generateQRCode = (pass: QRPass) => {
+  const generateQRCode = (pass: QRPass, device: DeviceWithPasses | null) => {
+    // Always generate URL dynamically using config.pwaBaseUrl
+    const dynamicUrl = device
+      ? generatePassUrl(
+          device.org_slug || "",
+          device.site_slug || "",
+          device.device_slug || "",
+          pass.qr_instance_id
+        )
+      : pass.qr_url || ""
+
     const qr = new QRCodeStyling({
       width: qrSettings.size,
       height: qrSettings.size,
       type: "svg",
-      data: pass.qr_url || "",
+      data: dynamicUrl,
       qrOptions: {
         errorCorrectionLevel: qrSettings.errorCorrection,
       },
@@ -133,11 +143,11 @@ export function QRGeneratorClient({ devices, sites }: QRGeneratorClientProps) {
   }
 
   useEffect(() => {
-    if (selectedPass) {
-      generateQRCode(selectedPass)
+    if (selectedPass && selectedDevice) {
+      generateQRCode(selectedPass, selectedDevice)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPass, qrSettings])
+  }, [selectedPass, selectedDevice, qrSettings])
 
   useEffect(() => {
     if (qrCode && qrRef.current) {
@@ -338,14 +348,14 @@ export function QRGeneratorClient({ devices, sites }: QRGeneratorClientProps) {
                   }
 
                   return passes.map((pass) => {
-                    const fullUrl =
-                      pass.qr_url ||
-                      generatePassUrl(
-                        selectedDevice.org_slug || "",
-                        selectedDevice.site_slug || "",
-                        selectedDevice.device_slug || "",
-                        pass.qr_instance_id
-                      )
+                    // Always generate URL dynamically using config.pwaBaseUrl
+                    // This ensures the URL uses the correct domain from env vars
+                    const fullUrl = generatePassUrl(
+                      selectedDevice.org_slug || "",
+                      selectedDevice.site_slug || "",
+                      selectedDevice.device_slug || "",
+                      pass.qr_instance_id
+                    )
 
                     return (
                       <div

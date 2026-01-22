@@ -34,20 +34,32 @@ export async function updateSession(request: NextRequest) {
     },
   )
 
-  // Skip auth check for webhook endpoints (they use their own auth via Authorization header)
-  if (request.nextUrl.pathname.startsWith("/api/webhooks")) {
+  // Skip auth check for webhook and cron endpoints (they use their own auth via Authorization header)
+  if (
+    request.nextUrl.pathname.startsWith("/api/v1/webhooks") ||
+    request.nextUrl.pathname.startsWith("/api/v1/cron") ||
+    request.nextUrl.pathname.startsWith("/api/webhooks") // Legacy path support
+  ) {
     return supabaseResponse
   }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-  if (!user && !request.nextUrl.pathname.startsWith("/auth") && request.nextUrl.pathname !== "/") {
+    // No user session - redirect to login for protected routes
+    if (!user && !request.nextUrl.pathname.startsWith("/auth") && request.nextUrl.pathname !== "/") {
+      const url = request.nextUrl.clone()
+      url.pathname = "/auth/login"
+      return NextResponse.redirect(url)
+    }
+
+    return supabaseResponse
+  } catch (error) {
+    // On error, redirect to login rather than showing error page
     const url = request.nextUrl.clone()
     url.pathname = "/auth/login"
     return NextResponse.redirect(url)
   }
-
-  return supabaseResponse
 }
