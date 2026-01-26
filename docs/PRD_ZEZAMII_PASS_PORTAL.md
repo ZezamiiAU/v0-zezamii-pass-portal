@@ -1,8 +1,9 @@
 # Product Requirements Document: Zezamii Pass Portal
 
-**Version:** 1.0  
+**Version:** 2.0  
 **Date:** January 2026  
 **Status:** Living Document
+**Last Updated:** 26 January 2026
 
 ---
 
@@ -65,10 +66,30 @@ The Zezamii Pass Portal is an admin interface for managing digital access passes
 - Idempotency handling
 - DELETE support for PIN revocation
 
-#### Backup Code System
-- Backup code pool management
-- Site-level backup code mode configuration
-- Cron job for code rotation
+#### PIN Code System (3-Tier Architecture)
+
+The system uses a 3-tier approach for PIN code resilience:
+
+| Tier | Name | Source | Description |
+|------|------|--------|-------------|
+| **Tier 1** | Primary Code | Rooms API | Real-time PIN from booking system |
+| **Tier 2** | Pool | Lock API | Pre-generated backup codes (bucketed by duration) |
+| **Tier 3** | Hail Mary | Lock API | Single emergency code per device (never expires) |
+
+**Tier 2 Pool Buckets:**
+| Bucket | Inventory | Use Case |
+|--------|-----------|----------|
+| `day_one_time` | 12 | Day passes (one-time use at lock level) |
+| `camp_4d` | 5 | Camping 1-4 days |
+| `camp_7d` | 4 | Camping 5-7 days |
+| `camp_14d` | 2 | Camping 8-14 days |
+| `camp_28d` | 2 | Camping 15-28 days |
+
+**Selection Flow:**
+1. Check Tier 1 (Primary) - if exists, return
+2. Check Tier 2 (Pool) - smart bucket match (nearest >= requested days)
+3. Check Tier 3 (Hail Mary) - emergency fallback + alert admin
+4. Return `NO_CODE` error if all tiers exhausted
 
 ### 2.4 Database Schema (Key Tables)
 
@@ -90,11 +111,277 @@ The Zezamii Pass Portal is an admin interface for managing digital access passes
 
 ---
 
-## 3. Recommended Enhancements
+## 3. Backend Services Architecture
 
-### 3.1 High Priority (Phase 1)
+### 3.1 Services Overview
 
-#### 3.1.1 Organizations Management Page
+| Service | Purpose | Runtime | Trigger | Endpoint |
+|---------|---------|---------|---------|----------|
+| **Rooms Webhook** | Receive Tier 1 primary codes | Vercel Serverless | HTTP POST from Rooms | `/api/v1/webhooks/rooms/pin` |
+| **Pool Replenish** | Maintain Tier 2 pool inventory | Vercel Cron | Scheduled (hourly) | `/api/v1/cron/backup-codes/replenish` |
+| **Pool Cleanup** | Remove expired pool codes | Vercel Cron | Scheduled (daily) | `/api/v1/cron/backup-codes/cleanup` |
+| **Hail Mary Check** | Ensure Tier 3 codes exist | Vercel Cron | Scheduled (daily) | `/api/v1/cron/backup-codes/hail-mary` |
+| **Lock API Client** | Create/delete codes on locks | Internal library | Called by services | `lib/lock-api/client.ts` |
+
+### 3.2 Service Details
+
+#### 3.2.1 Rooms Webhook Service
+**Endpoint:** `POST /api/v1/webhooks/rooms/pin`  
+**Runtime:** Vercel Serverless Function  
+**Auth:** HMAC signature via `ROOMS_WEBHOOK_SECRET`
+
+**Responsibilities:**
+- Receive PIN codes from Rooms booking system
+- Validate reservation exists in `pass.passes`
+- Store PIN in `pass.lock_codes` with provider = 'rooms'
+- Handle idempotent updates (same reservation, new code)
+
+**Inputs:**
+```json
+{
+  "reservationId": "uuid",
+  "pinCode": "1234",
+  "validFrom": "2026-01-26T10:00:00Z",
+  "validTo": "2026-01-28T10:00:00Z"
+}
+```
+
+---
+
+#### 3.2.2 Pool Replenish Service
+**Endpoint:** `GET /api/v1/cron/backup-codes/replenish`  
+**Runtime:** Vercel Cron  
+**Schedule:** Every hour (`0 * * * *`)  
+**Auth:** Vercel Cron signature
+
+**Responsibilities:**
+- Check pool inventory per device against targets
+- Create new backup codes via Lock API for low buckets
+- Store codes in `pass.backup_code_pool`
+- Log replenishment activity
+
+**Flow:**
+1. Query devices with `backup_code_mode = 'pool'`
+2. For each device, count available codes per bucket
+3. If count < target, call Lock API to create codes
+4. Insert new codes into `backup_code_pool`
+
+**Inventory Targets (per device):**
+| Bucket | Target |
+|--------|--------|
+| `day_one_time` | 12 |
+| `camp_4d` | 5 |
+| `camp_7d` | 4 |
+| `camp_14d` | 2 |
+| `camp_28d` | 2 |
+
+---
+
+#### 3.2.3 Pool Cleanup Service
+**Endpoint:** `GET /api/v1/cron/backup-codes/cleanup`  
+**Runtime:** Vercel Cron  
+**Schedule:** Daily at 2am (`0 2 * * *`)  
+**Auth:** Vercel Cron signature
+
+**Responsibilities:**
+- Find expired codes in `backup_code_pool` (status = 'available', expires_at < now)
+- Call Lock API to delete codes from physical locks
+- Update status to 'expired' or delete from table
+- Find used codes past retention period and archive/delete
+
+**Flow:**
+1. Query `backup_code_pool WHERE expires_at < NOW() AND status = 'available'`
+2. For each code, call Lock API `deleteCode(lockId, codeRef)`
+3. Update code status or delete row
+4. Log cleanup activity
+
+---
+
+#### 3.2.4 Hail Mary Check Service
+**Endpoint:** `GET /api/v1/cron/backup-codes/hail-mary`  
+**Runtime:** Vercel Cron  
+**Schedule:** Daily at 3am (`0 3 * * *`)  
+**Auth:** Vercel Cron signature
+
+**Responsibilities:**
+- Ensure every pool-enabled device has a Tier 3 hail mary code
+- Create missing hail mary codes via Lock API
+- Replace used hail mary codes
+- Alert if hail mary was used (indicates pool health issue)
+
+**Flow:**
+1. Query devices with `backup_code_mode = 'pool'`
+2. Check for existing hail mary code (category = 'hail_mary', status = 'available')
+3. If missing or used, create new via Lock API (no expiry)
+4. If previous was used, log alert for admin review
+
+---
+
+#### 3.2.5 Lock API Client
+**Location:** `lib/lock-api/client.ts`  
+**Type:** Internal library (not an endpoint)
+
+**Responsibilities:**
+- Abstract lock vendor API communication
+- Create PIN codes on physical locks
+- Delete PIN codes from locks
+- Handle retries and error cases
+
+**Interface:**
+```typescript
+interface LockAPIClient {
+  createCode(params: {
+    lockId: string;
+    pinCode: string;
+    validFrom: Date;
+    validUntil: Date | null;  // null = never expires
+    oneTime?: boolean;
+    label?: string;
+  }): Promise<{ success: boolean; codeRef: string }>;
+
+  deleteCode(params: {
+    lockId: string;
+    codeRef: string;
+  }): Promise<{ success: boolean }>;
+}
+```
+
+**Configuration:**
+- Lock API base URL via `LOCK_API_URL` env var
+- Auth via `LOCK_API_KEY` env var
+
+---
+
+### 3.3 Service Dependencies
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        External Systems                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   Rooms System              Lock Vendor API        Supabase     │
+│   (booking)                 (physical locks)       (database)   │
+│       │                           │                    │        │
+│       │ webhook                   │ REST               │ SQL    │
+│       ▼                           ▼                    ▼        │
+├─────────────────────────────────────────────────────────────────┤
+│                        Portal Services                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   ┌──────────────┐    ┌──────────────┐    ┌──────────────┐     │
+│   │   Rooms      │    │    Pool      │    │    Pool      │     │
+│   │   Webhook    │    │  Replenish   │    │   Cleanup    │     │
+│   │  (Tier 1)    │    │  (Tier 2)    │    │  (Tier 2)    │     │
+│   └──────────────┘    └──────────────┘    └──────────────┘     │
+│                                                                 │
+│   ┌──────────────┐    ┌──────────────────────────────────┐     │
+│   │  Hail Mary   │    │        Lock API Client           │     │
+│   │   Check      │    │   (shared by replenish/cleanup)  │     │
+│   │  (Tier 3)    │    └──────────────────────────────────┘     │
+│   └──────────────┘                                             │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│                           PWA                                    │
+├─────────────────────────────────────────────────────────────────┤
+│   pass.zezamii.com                                              │
+│   - Requests PIN via getBackupCode()                            │
+│   - Passes passType (day/camping) and campingDays               │
+│   - Receives code from Tier 1, 2, or 3                          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 3.4 Environment Variables Required
+
+| Variable | Service | Description |
+|----------|---------|-------------|
+| `ROOMS_WEBHOOK_SECRET` | Rooms Webhook | HMAC secret for webhook validation |
+| `LOCK_API_URL` | Lock API Client | Base URL for lock vendor API |
+| `LOCK_API_KEY` | Lock API Client | API key for lock vendor |
+| `SUPABASE_SERVICE_ROLE_KEY` | All services | Database access |
+| `CRON_SECRET` | Cron jobs | Vercel cron authentication |
+
+---
+
+### 3.5 Vercel Cron Configuration
+
+```json
+// vercel.json
+{
+  "crons": [
+    {
+      "path": "/api/v1/cron/backup-codes/replenish",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/v1/cron/backup-codes/cleanup",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/v1/cron/backup-codes/hail-mary",
+      "schedule": "0 3 * * *"
+    }
+  ]
+}
+```
+
+---
+
+## 4. Database Schema Changes
+
+### 4.1 Backup Code Pool Updates
+
+```sql
+-- Update category enum to new bucket names
+ALTER TABLE pass.backup_code_pool 
+  DROP CONSTRAINT IF EXISTS backup_code_pool_category_check;
+
+ALTER TABLE pass.backup_code_pool 
+  ADD CONSTRAINT backup_code_pool_category_check 
+  CHECK (category IN ('day_one_time', 'camp_4d', 'camp_7d', 'camp_14d', 'camp_28d', 'hail_mary'));
+
+-- Add lock_ref column for Lock API reference
+ALTER TABLE pass.backup_code_pool 
+  ADD COLUMN IF NOT EXISTS lock_ref TEXT;
+
+-- Add index for faster lookups
+CREATE INDEX IF NOT EXISTS idx_backup_code_pool_device_category 
+  ON pass.backup_code_pool(device_id, category, status);
+```
+
+### 4.2 Device Updates
+
+```sql
+-- Add hail_mary tracking columns (alternative to pool table)
+ALTER TABLE core.devices 
+  ADD COLUMN IF NOT EXISTS hail_mary_code TEXT,
+  ADD COLUMN IF NOT EXISTS hail_mary_lock_ref TEXT,
+  ADD COLUMN IF NOT EXISTS hail_mary_last_used TIMESTAMPTZ;
+```
+
+### 4.3 Alert/Logging Table
+
+```sql
+-- Track hail mary usage for alerting
+CREATE TABLE IF NOT EXISTS pass.backup_code_alerts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  device_id UUID NOT NULL REFERENCES core.devices(id),
+  alert_type TEXT NOT NULL,  -- 'hail_mary_used', 'pool_low', 'replenish_failed'
+  details JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  acknowledged_at TIMESTAMPTZ,
+  acknowledged_by UUID REFERENCES core.users(id)
+);
+```
+
+---
+
+## 5. Recommended Enhancements
+
+### 5.1 High Priority (Phase 1)
+
+#### 5.1.1 Organizations Management Page
 **Route:** `/dashboard/organisations`
 
 **Features:**
@@ -108,7 +395,7 @@ The Zezamii Pass Portal is an admin interface for managing digital access passes
 
 ---
 
-#### 3.1.2 Sites & Devices Management Page
+#### 5.1.2 Sites & Devices Management Page
 **Route:** `/dashboard/sites-devices`
 
 **Features:**
@@ -122,7 +409,7 @@ The Zezamii Pass Portal is an admin interface for managing digital access passes
 
 ---
 
-#### 3.1.3 Passes Management Page
+#### 5.1.3 Passes Management Page
 **Route:** `/dashboard/passes`
 
 **Features:**
@@ -136,7 +423,7 @@ The Zezamii Pass Portal is an admin interface for managing digital access passes
 
 ---
 
-#### 3.1.4 Pass Types Management Page
+#### 5.1.4 Pass Types Management Page
 **Route:** `/dashboard/pass-types`
 
 **Features:**
@@ -150,9 +437,9 @@ The Zezamii Pass Portal is an admin interface for managing digital access passes
 
 ---
 
-### 3.2 Medium Priority (Phase 2)
+### 5.2 Medium Priority (Phase 2)
 
-#### 3.2.1 Analytics Dashboard
+#### 5.2.1 Analytics Dashboard
 **Route:** `/dashboard/analytics`
 
 **Features:**
@@ -166,7 +453,7 @@ The Zezamii Pass Portal is an admin interface for managing digital access passes
 
 ---
 
-#### 3.2.2 User Management
+#### 5.2.2 User Management
 **Route:** `/dashboard/users`
 
 **Features:**
@@ -179,7 +466,7 @@ The Zezamii Pass Portal is an admin interface for managing digital access passes
 
 ---
 
-#### 3.2.3 Settings Page
+#### 5.2.3 Settings Page
 **Route:** `/dashboard/settings`
 
 **Features:**
@@ -191,7 +478,7 @@ The Zezamii Pass Portal is an admin interface for managing digital access passes
 
 ---
 
-#### 3.2.4 Audit Logs
+#### 5.2.4 Audit Logs
 **Route:** `/dashboard/audit`
 
 **Features:**
@@ -203,9 +490,9 @@ The Zezamii Pass Portal is an admin interface for managing digital access passes
 
 ---
 
-### 3.3 Lower Priority (Phase 3)
+### 5.3 Lower Priority (Phase 3)
 
-#### 3.3.1 Access Logs Viewer
+#### 5.3.1 Access Logs Viewer
 **Route:** `/dashboard/access-logs`
 
 **Features:**
@@ -217,7 +504,7 @@ The Zezamii Pass Portal is an admin interface for managing digital access passes
 
 ---
 
-#### 3.3.2 Webhook Management
+#### 5.3.2 Webhook Management
 **Route:** `/dashboard/webhooks`
 
 **Features:**
@@ -229,7 +516,7 @@ The Zezamii Pass Portal is an admin interface for managing digital access passes
 
 ---
 
-#### 3.3.3 Reports & Exports
+#### 5.3.3 Reports & Exports
 **Route:** `/dashboard/reports`
 
 **Features:**
@@ -239,7 +526,7 @@ The Zezamii Pass Portal is an admin interface for managing digital access passes
 
 ---
 
-#### 3.3.4 Integration Management
+#### 5.3.4 Integration Management
 **Route:** `/dashboard/integrations`
 
 **Features:**
@@ -251,9 +538,9 @@ The Zezamii Pass Portal is an admin interface for managing digital access passes
 
 ---
 
-## 4. API Enhancements
+## 6. API Enhancements
 
-### 4.1 New Endpoints Needed
+### 6.1 New Endpoints Needed
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
@@ -272,25 +559,25 @@ The Zezamii Pass Portal is an admin interface for managing digital access passes
 
 ---
 
-## 5. Technical Considerations
+## 7. Technical Considerations
 
-### 5.1 Authentication & Authorization
+### 7.1 Authentication & Authorization
 - Current: Basic auth via Supabase
 - Needed: Role-based access control (RBAC)
 - Consider: Organization-scoped permissions
 
-### 5.2 Performance
+### 7.2 Performance
 - Implement pagination for list views
 - Add caching for dashboard stats
 - Consider real-time updates via Supabase subscriptions
 
-### 5.3 Mobile Responsiveness
+### 7.3 Mobile Responsiveness
 - Dashboard should work on tablets
 - Consider mobile-optimized views for field workers
 
 ---
 
-## 6. Success Metrics
+## 8. Success Metrics
 
 | Metric | Target |
 |--------|--------|
@@ -301,7 +588,7 @@ The Zezamii Pass Portal is an admin interface for managing digital access passes
 
 ---
 
-## 7. Implementation Roadmap
+## 9. Implementation Roadmap
 
 ### Phase 1 (4-6 weeks)
 - Organizations page
@@ -323,7 +610,7 @@ The Zezamii Pass Portal is an admin interface for managing digital access passes
 
 ---
 
-## 8. Appendix
+## 10. Appendix
 
 ### A. Current File Structure
 

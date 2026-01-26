@@ -9,8 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
-import { AlertCircle, ArrowLeft, CheckCircle2, Download, FileJson, FileSpreadsheet } from "lucide-react"
-import Link from "next/link"
+import { AlertCircle, CheckCircle2, Download, FileJson, FileSpreadsheet } from "lucide-react"
 import { validateConfiguration } from "./actions"
 import { excelDataToJson } from "@/lib/utils/excel-converter"
 
@@ -505,13 +504,6 @@ export default function ConfigUploadPage() {
   return (
     <div className="container mx-auto py-8 max-w-6xl">
       <div className="mb-8">
-        <Link
-          href="/dashboard"
-          className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4"
-        >
-          <ArrowLeft className="mr-1 h-4 w-4" />
-          Back to Dashboard
-        </Link>
         <h1 className="text-3xl font-bold">Tenant Configuration Upload</h1>
         <p className="text-muted-foreground mt-2">
           Upload and validate JSON or Excel configuration files to set up new tenants
