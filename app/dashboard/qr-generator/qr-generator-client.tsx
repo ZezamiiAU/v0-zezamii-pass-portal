@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
-import { Copy, Trash2, QrCode, MapPin, Hash, Lock } from "lucide-react"
+import { ArrowLeft, Copy, Trash2, QrCode, MapPin, Hash, Lock } from "lucide-react"
+import Link from "next/link"
 import { deleteQRPass } from "./actions"
 import { generatePassUrl } from "@/lib/config"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -161,6 +162,13 @@ export function QRGeneratorClient({ devices, sites }: QRGeneratorClientProps) {
       {/* Left Sidebar - Device Selection */}
       <div className="w-80 space-y-4 overflow-y-auto border-r px-6 pt-4">
         <div>
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4"
+          >
+            <ArrowLeft className="mr-1 h-4 w-4" />
+            Back to Dashboard
+          </Link>
           <h2 className="text-lg font-semibold mb-4">Select Device</h2>
 
           <div className="space-y-3">
