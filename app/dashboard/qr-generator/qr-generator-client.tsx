@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { Copy, Trash2, QrCode, MapPin, Hash, Lock } from "lucide-react"
 import { deleteQRPass } from "./actions"
-import { generatePassUrl } from "@/lib/config"
+import { generatePassUrl, generatePreviewPassUrl } from "@/lib/config"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface QRPass {
@@ -356,6 +356,14 @@ export function QRGeneratorClient({ devices, sites }: QRGeneratorClientProps) {
                       selectedDevice.device_slug || "",
                       pass.qr_instance_id
                     )
+                    
+                    // Generate preview URL for testing
+                    const previewUrl = generatePreviewPassUrl(
+                      selectedDevice.org_slug || "",
+                      selectedDevice.site_slug || "",
+                      selectedDevice.device_slug || "",
+                      pass.qr_instance_id
+                    )
 
                     return (
                       <div
@@ -403,22 +411,49 @@ export function QRGeneratorClient({ devices, sites }: QRGeneratorClientProps) {
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
-                        <div className="flex items-start gap-2 mt-3">
-                          <div className="text-xs text-muted-foreground font-mono break-all flex-1 bg-muted/50 p-2 rounded">
-                            {fullUrl}
+                        
+                        {/* Production URL */}
+                        <div className="mt-3 space-y-2">
+                          <div className="text-xs font-medium text-muted-foreground">Production URL</div>
+                          <div className="flex items-start gap-2">
+                            <div className="text-xs text-muted-foreground font-mono break-all flex-1 bg-muted/50 p-2 rounded">
+                              {fullUrl}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 shrink-0"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                copyToClipboard(fullUrl)
+                              }}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 shrink-0"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              copyToClipboard(fullUrl)
-                            }}
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
                         </div>
+                        
+                        {/* Preview URL */}
+                        <div className="mt-2 space-y-2">
+                          <div className="text-xs font-medium text-amber-600">Preview URL</div>
+                          <div className="flex items-start gap-2">
+                            <div className="text-xs text-amber-600/80 font-mono break-all flex-1 bg-amber-50 p-2 rounded border border-amber-200">
+                              {previewUrl}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 shrink-0"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                copyToClipboard(previewUrl)
+                              }}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        
                         <div className="text-xs text-muted-foreground mt-3 pt-2 border-t border-border/50">
                           Created{" "}
                           {new Date(pass.created_at).toLocaleDateString(undefined, {
