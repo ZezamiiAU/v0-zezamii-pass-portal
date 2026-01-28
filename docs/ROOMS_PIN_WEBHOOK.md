@@ -13,7 +13,7 @@
 
 ## Overall Logic Flow
 
-```
+\`\`\`
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                           PASS PURCHASE FLOW                                │
 │                    (Two-Phase: PENDING + CONFIRMED)                         │
@@ -112,7 +112,7 @@
      │<───────────────│                │                │                │
      │                │                │                │                │
      ▼                ▼                ▼                ▼                ▼
-```
+\`\`\`
 
 ### Flow Summary
 
@@ -131,7 +131,7 @@
 
 If the PIN is not received within the countdown timer (e.g., 30 seconds), the PWA uses a backup code and notifies Rooms to cancel the pending request.
 
-```
+\`\`\`
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                     TIMEOUT / BACKUP CODE FLOW                              │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -183,7 +183,7 @@ If the PIN is not received within the countdown timer (e.g., 30 seconds), the PW
      │<───────────────│                │                │
      │                │                │                │
      ▼                ▼                ▼                ▼
-```
+\`\`\`
 
 ### Timeout Flow Summary
 
@@ -207,9 +207,9 @@ If the PIN is not received within the countdown timer (e.g., 30 seconds), the PW
 
 All requests require Bearer token authentication:
 
-```
+\`\`\`
 Authorization: Bearer <ROOMS_WEBHOOK_SECRET>
-```
+\`\`\`
 
 ### Configuration
 
@@ -234,7 +234,7 @@ Creates or updates a PIN code for a pass. Supports two payload formats.
 
 **Request (Flat Format - Simple):**
 
-```http
+\`\`\`http
 POST https://api-pass.zezamii.com/api/webhooks/rooms/pin
 Authorization: Bearer <ROOMS_WEBHOOK_SECRET>
 Content-Type: application/json
@@ -245,11 +245,11 @@ Content-Type: application/json
   "validFrom": "2026-01-21T10:00:00Z",
   "validUntil": "2026-01-21T23:59:00Z"
 }
-```
+\`\`\`
 
 **Request (Nested Event Format - From Rooms PRD):**
 
-```http
+\`\`\`http
 POST https://api-pass.zezamii.com/api/webhooks/rooms/pin
 Authorization: Bearer <ROOMS_WEBHOOK_SECRET>
 Content-Type: application/json
@@ -267,7 +267,7 @@ Content-Type: application/json
     "guestName": "John Smith"
   }
 }
-```
+\`\`\`
 
 **Request Fields (Flat Format):**
 
@@ -303,33 +303,33 @@ Content-Type: application/json
 
 **Success Response (new/updated PIN):**
 
-```json
+\`\`\`json
 {
   "success": true,
   "message": "PIN code received and stored",
   "passId": "uuid-of-the-pass"
 }
-```
+\`\`\`
 
 **Idempotent Response (PIN already set with same value):**
 
-```json
+\`\`\`json
 {
   "success": true,
   "message": "PIN code already set (no changes made)",
   "passId": "uuid-of-the-pass",
   "idempotent": true
 }
-```
+\`\`\`
 
 **Error Response:**
 
-```json
+\`\`\`json
 {
   "error": "Bad Request",
   "message": "reservationId and pinCode are required"
 }
-```
+\`\`\`
 
 ---
 
@@ -339,7 +339,7 @@ Cancels a pending PIN request or revokes an existing PIN. The `reason` field det
 
 **Request:**
 
-```http
+\`\`\`http
 DELETE https://api-pass.zezamii.com/api/webhooks/rooms/pin
 Authorization: Bearer <ROOMS_WEBHOOK_SECRET>
 Content-Type: application/json
@@ -348,7 +348,7 @@ Content-Type: application/json
   "reservationId": "uuid-of-the-pass",
   "reason": "timeout"
 }
-```
+\`\`\`
 
 **Request Fields:**
 
@@ -378,7 +378,7 @@ Content-Type: application/json
 
 **Success Response (timeout/backup - pass stays active):**
 
-```json
+\`\`\`json
 {
   "success": true,
   "message": "PIN request cancelled (backup code in use)",
@@ -386,11 +386,11 @@ Content-Type: application/json
   "reason": "timeout",
   "passActive": true
 }
-```
+\`\`\`
 
 **Success Response (cancellation - pass cancelled):**
 
-```json
+\`\`\`json
 {
   "success": true,
   "message": "PIN code revoked and pass cancelled",
@@ -398,18 +398,18 @@ Content-Type: application/json
   "reason": "user_cancelled",
   "passActive": false
 }
-```
+\`\`\`
 
 **Idempotent Response (already revoked):**
 
-```json
+\`\`\`json
 {
   "success": true,
   "message": "PIN already revoked (no changes made)",
   "passId": "uuid-of-the-pass",
   "idempotent": true
 }
-```
+\`\`\`
 
 ---
 
@@ -419,18 +419,18 @@ Simple health check endpoint to verify the webhook is available. No authenticati
 
 **Request:**
 
-```http
+\`\`\`http
 GET https://api-pass.zezamii.com/api/webhooks/rooms/pin
-```
+\`\`\`
 
 **Response:** `200 OK`
 
-```json
+\`\`\`json
 {
   "status": "ok",
   "service": "rooms-pin-webhook"
 }
-```
+\`\`\`
 
 ---
 
@@ -558,7 +558,7 @@ When user selects a pass, create records in Portal DB.
 
 **Important:** Use `.schema('pass')` to access the pass schema tables.
 
-```javascript
+\`\`\`javascript
 // Create pending pass
 const { data: pass, error: passError } = await supabase
   .schema('pass')
@@ -589,11 +589,11 @@ const { data: lockCode, error: lockCodeError } = await supabase
   })
   .select()
   .single()
-```
+\`\`\`
 
 #### Step 2: Call Stripe and Rooms in Parallel
 
-```javascript
+\`\`\`javascript
 // Call both in parallel
 const [stripeResult, roomsResult] = await Promise.all([
   // Stripe: Create payment intent
@@ -615,11 +615,11 @@ const [stripeResult, roomsResult] = await Promise.all([
     })
   })
 ])
-```
+\`\`\`
 
 #### Step 3: Process Payment
 
-```javascript
+\`\`\`javascript
 // Show payment form to user
 // ... Stripe Elements or Payment Sheet
 
@@ -645,11 +645,11 @@ if (error) {
     
   return { success: false, error: 'Payment failed' }
 }
-```
+\`\`\`
 
 #### Step 4: Send CONFIRMED to Rooms
 
-```javascript
+\`\`\`javascript
 // Payment successful - tell Rooms to generate PIN
 await fetch(`${ROOMS_API_URL}/confirmed`, {
   method: 'POST',
@@ -659,11 +659,11 @@ await fetch(`${ROOMS_API_URL}/confirmed`, {
     paymentIntentId: paymentIntent.id,
   })
 })
-```
+\`\`\`
 
 #### Step 5: Poll for PIN with Countdown
 
-```javascript
+\`\`\`javascript
 const POLL_INTERVAL = 2000  // 2 seconds
 const TIMEOUT = 30000       // 30 seconds
 
@@ -696,11 +696,11 @@ async function pollForPin(passId) {
   // Timeout - use backup code
   return { success: false, timeout: true }
 }
-```
+\`\`\`
 
 #### Step 6: Handle Timeout - Use Backup Code
 
-```javascript
+\`\`\`javascript
 const result = await pollForPin(pass.id)
 
 if (result.success) {
@@ -732,11 +732,11 @@ if (result.success) {
   // Display backup code
   showBackupCodeToUser(backupCode?.pincode || 'Contact support')
 }
-```
+\`\`\`
 
 ### Complete Flow Code
 
-```javascript
+\`\`\`javascript
 async function purchasePass(passTypeId, siteId, deviceId, startDate, endDate) {
   try {
     // 1. Create pending pass (note: valid_to, not valid_until)
@@ -790,7 +790,7 @@ async function purchasePass(passTypeId, siteId, deviceId, startDate, endDate) {
     throw error
   }
 }
-```
+\`\`\`
 
 ### Error Handling Summary
 
