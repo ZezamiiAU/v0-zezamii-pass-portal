@@ -12,7 +12,7 @@
 
 ## Integration Overview
 
-```
+\`\`\`
 ┌──────────┐                    ┌──────────┐                    ┌──────────┐
 │   PWA    │                    │  Rooms   │                    │  Portal  │
 │          │                    │   API    │                    │ Webhook  │
@@ -36,7 +36,7 @@
      │                               │  <─────────────────────────   │
      │                               │                               │
      ▼                               ▼                               ▼
-```
+\`\`\`
 
 ### What Rooms Needs To Do
 
@@ -52,9 +52,9 @@
 
 All webhook requests must include:
 
-```
+\`\`\`
 Authorization: Bearer <ROOMS_WEBHOOK_SECRET>
-```
+\`\`\`
 
 **Setup:** We will share the `ROOMS_WEBHOOK_SECRET` value with you securely. Configure it for your outbound webhook calls.
 
@@ -70,18 +70,18 @@ Call this endpoint after generating a PIN (when you receive CONFIRMED from PWA).
 
 **Option A: Simple Flat Format**
 
-```json
+\`\`\`json
 {
   "reservationId": "483876d8-0e8b-4d34-bef6-00240e89cc58",
   "pinCode": "4829",
   "validFrom": "2026-01-21T00:00:00Z",
   "validUntil": "2026-01-22T00:00:00Z"
 }
-```
+\`\`\`
 
 **Option B: Nested Event Format**
 
-```json
+\`\`\`json
 {
   "event": "pin.created",
   "timestamp": "2026-01-21T10:30:00Z",
@@ -95,7 +95,7 @@ Call this endpoint after generating a PIN (when you receive CONFIRMED from PWA).
     "guestName": "John Smith"
   }
 }
-```
+\`\`\`
 
 ### Request Fields
 
@@ -109,39 +109,39 @@ Call this endpoint after generating a PIN (when you receive CONFIRMED from PWA).
 ### Responses
 
 **Success (200):**
-```json
+\`\`\`json
 {
   "success": true,
   "message": "PIN code received and stored",
   "passId": "483876d8-0e8b-4d34-bef6-00240e89cc58"
 }
-```
+\`\`\`
 
 **Idempotent (200) - Same PIN already set:**
-```json
+\`\`\`json
 {
   "success": true,
   "message": "PIN code already set (no changes made)",
   "passId": "483876d8-0e8b-4d34-bef6-00240e89cc58",
   "idempotent": true
 }
-```
+\`\`\`
 
 **Error (400):**
-```json
+\`\`\`json
 {
   "error": "Bad Request",
   "message": "reservationId and pinCode are required"
 }
-```
+\`\`\`
 
 **Unauthorized (401):**
-```json
+\`\`\`json
 {
   "error": "Unauthorized",
   "message": "Invalid or missing authorization"
 }
-```
+\`\`\`
 
 ---
 
@@ -153,12 +153,12 @@ Call this if Rooms needs to revoke a previously delivered PIN.
 
 ### Request
 
-```json
+\`\`\`json
 {
   "reservationId": "483876d8-0e8b-4d34-bef6-00240e89cc58",
   "reason": "user_cancelled"
 }
-```
+\`\`\`
 
 ### Reason Values
 
@@ -171,7 +171,7 @@ Call this if Rooms needs to revoke a previously delivered PIN.
 
 ### Response
 
-```json
+\`\`\`json
 {
   "success": true,
   "message": "PIN code revoked and pass cancelled",
@@ -179,7 +179,7 @@ Call this if Rooms needs to revoke a previously delivered PIN.
   "reason": "user_cancelled",
   "passActive": false
 }
-```
+\`\`\`
 
 ---
 
@@ -190,12 +190,12 @@ No authentication required. Use to verify the webhook is available.
 **Endpoint:** `GET https://api-pass.zezamii.com/api/webhooks/rooms/pin`
 
 **Response (200):**
-```json
+\`\`\`json
 {
   "status": "ok",
   "service": "rooms-pin-webhook"
 }
-```
+\`\`\`
 
 ---
 
@@ -203,7 +203,7 @@ No authentication required. Use to verify the webhook is available.
 
 If PWA sends CANCEL (e.g., user timeout waiting for PIN):
 
-```
+\`\`\`
 ┌──────────┐                    ┌──────────┐
 │   PWA    │                    │  Rooms   │
 └────┬─────┘                    └────┬─────┘
@@ -218,7 +218,7 @@ If PWA sends CANCEL (e.g., user timeout waiting for PIN):
      │  <─────────────────────────   │
      │                               │
      ▼                               ▼
-```
+\`\`\`
 
 **Important:** When you receive CANCEL, do NOT call the Portal webhook. The PWA will use a backup code instead.
 
@@ -256,12 +256,12 @@ For 5xx errors, retry with exponential backoff:
 ## Testing
 
 ### Health Check
-```bash
+\`\`\`bash
 curl https://api-pass.zezamii.com/api/webhooks/rooms/pin
-```
+\`\`\`
 
 ### Deliver PIN (Test)
-```bash
+\`\`\`bash
 curl -X POST https://api-pass.zezamii.com/api/webhooks/rooms/pin \
   -H "Authorization: Bearer <ROOMS_WEBHOOK_SECRET>" \
   -H "Content-Type: application/json" \
@@ -271,7 +271,7 @@ curl -X POST https://api-pass.zezamii.com/api/webhooks/rooms/pin \
     "validFrom": "2026-01-21T00:00:00Z",
     "validUntil": "2026-01-22T00:00:00Z"
   }'
-```
+\`\`\`
 
 ---
 

@@ -137,14 +137,14 @@ The system uses a 3-tier approach for PIN code resilience:
 - Handle idempotent updates (same reservation, new code)
 
 **Inputs:**
-```json
+\`\`\`json
 {
   "reservationId": "uuid",
   "pinCode": "1234",
   "validFrom": "2026-01-26T10:00:00Z",
   "validTo": "2026-01-28T10:00:00Z"
 }
-```
+\`\`\`
 
 ---
 
@@ -228,7 +228,7 @@ The system uses a 3-tier approach for PIN code resilience:
 - Handle retries and error cases
 
 **Interface:**
-```typescript
+\`\`\`typescript
 interface LockAPIClient {
   createCode(params: {
     lockId: string;
@@ -244,7 +244,7 @@ interface LockAPIClient {
     codeRef: string;
   }): Promise<{ success: boolean }>;
 }
-```
+\`\`\`
 
 **Configuration:**
 - Lock API base URL via `LOCK_API_URL` env var
@@ -254,7 +254,7 @@ interface LockAPIClient {
 
 ### 3.3 Service Dependencies
 
-```
+\`\`\`
 ┌─────────────────────────────────────────────────────────────────┐
 │                        External Systems                          │
 ├─────────────────────────────────────────────────────────────────┤
@@ -288,7 +288,7 @@ interface LockAPIClient {
 │   - Passes passType (day/camping) and campingDays               │
 │   - Receives code from Tier 1, 2, or 3                          │
 └─────────────────────────────────────────────────────────────────┘
-```
+\`\`\`
 
 ---
 
@@ -306,7 +306,7 @@ interface LockAPIClient {
 
 ### 3.5 Vercel Cron Configuration
 
-```json
+\`\`\`json
 // vercel.json
 {
   "crons": [
@@ -324,7 +324,7 @@ interface LockAPIClient {
     }
   ]
 }
-```
+\`\`\`
 
 ---
 
@@ -332,7 +332,7 @@ interface LockAPIClient {
 
 ### 4.1 Backup Code Pool Updates
 
-```sql
+\`\`\`sql
 -- Update category enum to new bucket names
 ALTER TABLE pass.backup_code_pool 
   DROP CONSTRAINT IF EXISTS backup_code_pool_category_check;
@@ -348,21 +348,21 @@ ALTER TABLE pass.backup_code_pool
 -- Add index for faster lookups
 CREATE INDEX IF NOT EXISTS idx_backup_code_pool_device_category 
   ON pass.backup_code_pool(device_id, category, status);
-```
+\`\`\`
 
 ### 4.2 Device Updates
 
-```sql
+\`\`\`sql
 -- Add hail_mary tracking columns (alternative to pool table)
 ALTER TABLE core.devices 
   ADD COLUMN IF NOT EXISTS hail_mary_code TEXT,
   ADD COLUMN IF NOT EXISTS hail_mary_lock_ref TEXT,
   ADD COLUMN IF NOT EXISTS hail_mary_last_used TIMESTAMPTZ;
-```
+\`\`\`
 
 ### 4.3 Alert/Logging Table
 
-```sql
+\`\`\`sql
 -- Track hail mary usage for alerting
 CREATE TABLE IF NOT EXISTS pass.backup_code_alerts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -373,7 +373,7 @@ CREATE TABLE IF NOT EXISTS pass.backup_code_alerts (
   acknowledged_at TIMESTAMPTZ,
   acknowledged_by UUID REFERENCES core.users(id)
 );
-```
+\`\`\`
 
 ---
 
@@ -614,7 +614,7 @@ CREATE TABLE IF NOT EXISTS pass.backup_code_alerts (
 
 ### A. Current File Structure
 
-```
+\`\`\`
 app/
 ├── api/v1/
 │   ├── cron/backup-codes/route.ts
@@ -651,18 +651,18 @@ lib/
 │   ├── qr-generator.ts
 │   └── sql-generator.ts
 └── validations/pass.ts
-```
+\`\`\`
 
 ### B. Environment Variables
 
-```
+\`\`\`
 SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_URL
 SUPABASE_SERVICE_ROLE_KEY
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 NEXT_PUBLIC_PWA_BASE_URL
 ROOMS_WEBHOOK_SECRET
-```
+\`\`\`
 
 ### C. Related Systems
 

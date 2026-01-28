@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { FileUp, Building2, MapPin, QrCode } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 export default async function DashboardPage() {
   const _supabase = await createClient()
@@ -77,8 +78,4 @@ export default async function DashboardPage() {
       </div>
     </div>
   )
-}
-
-function cn(...classes: (string | undefined | false)[]) {
-  return classes.filter(Boolean).join(" ")
 }

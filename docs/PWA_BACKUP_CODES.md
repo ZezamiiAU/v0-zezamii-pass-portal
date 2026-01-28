@@ -19,9 +19,9 @@ The backup code system supports two modes:
 
 Add to PWA `.env`:
 
-```
+\`\`\`
 BACKUP_CODE_MODE=fortnightly
-```
+\`\`\`
 
 This is the fallback if a site doesn't have an explicit setting. Leave unset or set to `fortnightly` to keep current behavior.
 
@@ -37,7 +37,7 @@ This is the fallback if a site doesn't have an explicit setting. Leave unset or 
 
 ### Step 1: Get Backup Code Mode
 
-```javascript
+\`\`\`javascript
 async function getBackupCodeMode(supabase, siteId) {
   // Check site-level setting
   const { data: site } = await supabase
@@ -51,11 +51,11 @@ async function getBackupCodeMode(supabase, siteId) {
     || process.env.BACKUP_CODE_MODE 
     || 'fortnightly'
 }
-```
+\`\`\`
 
 ### Step 2: Get Backup Code (Fortnightly Mode)
 
-```javascript
+\`\`\`javascript
 async function getFortnightlyBackupCode(supabase, siteId, deviceId) {
   const now = new Date().toISOString()
 
@@ -84,13 +84,13 @@ async function getFortnightlyBackupCode(supabase, siteId, deviceId) {
     mode: 'fortnightly'
   }
 }
-```
+\`\`\`
 
 ### Step 3: Get Backup Code (Pool Mode)
 
 Pool mode uses a waterfall: tries shortest validity first (day pass), falls back to longer (camping).
 
-```javascript
+\`\`\`javascript
 const CATEGORY_PRIORITY = ['day', 'camping_3d', 'camping_7d', 'camping_14d']
 
 async function assignBackupCodeFromPool(supabase, passId, deviceId) {
@@ -151,11 +151,11 @@ async function assignBackupCodeFromPool(supabase, passId, deviceId) {
 
   return { success: false, error: 'No backup codes available' }
 }
-```
+\`\`\`
 
 ### Step 4: Main Function
 
-```javascript
+\`\`\`javascript
 async function getBackupCode(supabase, passId, siteId, deviceId) {
   const mode = await getBackupCodeMode(supabase, siteId)
 
@@ -165,13 +165,13 @@ async function getBackupCode(supabase, passId, siteId, deviceId) {
     return getFortnightlyBackupCode(supabase, siteId, deviceId)
   }
 }
-```
+\`\`\`
 
 ---
 
 ## Usage in Timeout Flow
 
-```javascript
+\`\`\`javascript
 // When Rooms PIN times out...
 const result = await pollForPin(passId)
 
@@ -193,7 +193,7 @@ if (!result.success) {
     showError('No backup code available. Please contact support.')
   }
 }
-```
+\`\`\`
 
 ---
 
@@ -250,7 +250,7 @@ if (!result.success) {
 
 If a pass is cancelled and used pool mode, release the code back:
 
-```javascript
+\`\`\`javascript
 async function releaseBackupCode(supabase, passId) {
   await supabase
     .schema('pass')
@@ -263,7 +263,7 @@ async function releaseBackupCode(supabase, passId) {
     .eq('pass_id', passId)
     .eq('status', 'assigned')
 }
-```
+\`\`\`
 
 ---
 
