@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Building2, FileUp, Home, MapPin, Package, Settings, CreditCard, LogOut, QrCode } from "lucide-react"
+import { Building2, FileUp, Home, MapPin, Package, Settings, CreditCard, LogOut, QrCode, Layers } from "lucide-react"
 import type { User } from "@supabase/supabase-js"
 
 const navigation = [
@@ -13,6 +13,7 @@ const navigation = [
   { name: "QR Generator", href: "/dashboard/qr-generator", icon: QrCode },
   { name: "Organisations", href: "/dashboard/organisations", icon: Building2 },
   { name: "Sites & Devices", href: "/dashboard/sites", icon: MapPin },
+  { name: "Pass Profiles", href: "/dashboard/profiles", icon: Layers },
   { name: "Pass Types", href: "/dashboard/pass-types", icon: Package },
   { name: "Passes", href: "/dashboard/passes", icon: CreditCard },
   { name: "Settings", href: "/dashboard/settings", icon: Settings },
