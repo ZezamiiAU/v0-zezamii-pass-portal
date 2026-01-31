@@ -61,13 +61,22 @@ END $$;
 CREATE INDEX IF NOT EXISTS idx_pass_profiles_site_id ON pass.pass_profiles(site_id);
 CREATE INDEX IF NOT EXISTS idx_pass_types_profile_id ON pass.pass_types(profile_id);
 
--- 4) Updated_at trigger for pass_profiles
+-- 4) Create update_updated_at_column function if it doesn't exist
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 5) Updated_at trigger for pass_profiles
 DROP TRIGGER IF EXISTS update_pass_profiles_updated_at ON pass.pass_profiles;
 CREATE TRIGGER update_pass_profiles_updated_at 
   BEFORE UPDATE ON pass.pass_profiles
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- 5) RLS policies for pass_profiles (matching existing pattern)
+-- 6) RLS policies for pass_profiles (matching existing pattern)
 ALTER TABLE pass.pass_profiles ENABLE ROW LEVEL SECURITY;
 
 -- Drop existing policies if they exist (for idempotent reruns)
@@ -96,7 +105,7 @@ CREATE POLICY "Allow authenticated delete to pass_profiles"
   TO authenticated
   USING (true);
 
--- 6) Add comment for documentation
+-- 7) Add comment for documentation
 COMMENT ON TABLE pass.pass_profiles IS 'Profile-driven pass configuration. Enables booking behaviour per pass type. NULL profile_id on pass_types preserves legacy behaviour.';
 COMMENT ON COLUMN pass.pass_profiles.entry_buffer_minutes IS 'Buffer before pass validity starts. API exposes as buffer_before_minutes.';
 COMMENT ON COLUMN pass.pass_profiles.exit_buffer_minutes IS 'Buffer after pass validity ends. API exposes as buffer_after_minutes.';
