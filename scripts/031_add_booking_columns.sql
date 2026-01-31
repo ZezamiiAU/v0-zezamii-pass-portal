@@ -16,5 +16,5 @@ WHERE booked_from IS NOT NULL AND booked_to IS NOT NULL;
 COMMENT ON COLUMN pass.passes.booked_from IS 'User-selected booking start time (nullable, only set when future_booking_enabled)';
 COMMENT ON COLUMN pass.passes.booked_to IS 'User-selected booking end time (nullable, only set when future_booking_enabled)';
 
--- Note: valid_from / valid_to remain the authoritative access window
+-- Note: valid_from / valid_until remain the authoritative access window
 -- booked_from / booked_to are the user's requested time slot (may differ due to buffers)

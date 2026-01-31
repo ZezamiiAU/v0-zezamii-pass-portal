@@ -258,7 +258,7 @@ export async function POST(request) {
       pass_id: pass.id,
       pass_number: pass.pass_number,
       valid_from: pass.valid_from,
-      valid_to: pass.valid_until,
+      valid_until: pass.valid_until,
       price_cents: passType.price_cents,
     }
 
@@ -355,7 +355,7 @@ export async function GET(request) {
         guest_email: pass.guest_email,
         guest_phone: pass.guest_phone,
         valid_from: pass.valid_from,
-        valid_to: pass.valid_until,
+        valid_until: pass.valid_until,
         booked_from: pass.booked_from,
         booked_to: pass.booked_to,
         status: pass.status,
