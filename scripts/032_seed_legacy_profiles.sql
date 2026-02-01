@@ -6,8 +6,8 @@
 -- Schema relationship:
 --   pass_types.organization_id -> organisations.id
 --   pass_profiles.site_id -> sites.id
---   sites.organization_id -> organisations.id
--- So we join pass_types -> organisations -> sites to get site_id for profiles
+--   sites.org_id -> organisations.id
+-- So we join pass_types -> sites via org_id to get site_id for profiles
 
 -- Step 1: Create end_of_day profile for each site in organizations that have Day pass types
 -- Day passes: valid until 23:59 on the selected date
@@ -39,7 +39,7 @@ SELECT DISTINCT
   false, -- Future booking OFF by default
   false  -- Availability enforcement OFF by default
 FROM pass.pass_types pt
-JOIN core.sites s ON s.organization_id = pt.organization_id
+JOIN core.sites s ON s.org_id = pt.organization_id
 WHERE pt.name ILIKE '%day%'
   AND pt.profile_id IS NULL
   AND NOT EXISTS (
@@ -78,7 +78,7 @@ SELECT DISTINCT
   false, -- Future booking OFF by default
   false  -- Availability enforcement OFF by default
 FROM pass.pass_types pt
-JOIN core.sites s ON s.organization_id = pt.organization_id
+JOIN core.sites s ON s.org_id = pt.organization_id
 WHERE (pt.name ILIKE '%camp%' OR pt.name ILIKE '%overnight%' OR pt.name ILIKE '%night%')
   AND pt.profile_id IS NULL
   AND NOT EXISTS (
@@ -93,7 +93,7 @@ SET profile_id = pp.id,
     updated_at = now()
 FROM pass.pass_profiles pp
 JOIN core.sites s ON pp.site_id = s.id
-WHERE s.organization_id = pt.organization_id
+WHERE s.org_id = pt.organization_id
   AND pp.code = 'end_of_day'
   AND pt.name ILIKE '%day%'
   AND pt.profile_id IS NULL;
@@ -104,7 +104,7 @@ SET profile_id = pp.id,
     updated_at = now()
 FROM pass.pass_profiles pp
 JOIN core.sites s ON pp.site_id = s.id
-WHERE s.organization_id = pt.organization_id
+WHERE s.org_id = pt.organization_id
   AND pp.code = 'nights_checkout'
   AND (pt.name ILIKE '%camp%' OR pt.name ILIKE '%overnight%' OR pt.name ILIKE '%night%')
   AND pt.profile_id IS NULL;
@@ -139,7 +139,7 @@ SELECT DISTINCT
   false, -- Future booking OFF
   false  -- Availability enforcement OFF
 FROM pass.pass_types pt
-JOIN core.sites s ON s.organization_id = pt.organization_id
+JOIN core.sites s ON s.org_id = pt.organization_id
 WHERE pt.profile_id IS NULL
   AND NOT EXISTS (
     SELECT 1 FROM pass.pass_profiles pp 
@@ -153,7 +153,7 @@ SET profile_id = pp.id,
     updated_at = now()
 FROM pass.pass_profiles pp
 JOIN core.sites s ON pp.site_id = s.id
-WHERE s.organization_id = pt.organization_id
+WHERE s.org_id = pt.organization_id
   AND pp.code = 'instant_access'
   AND pt.profile_id IS NULL;
 
