@@ -4,7 +4,7 @@
 -- Rollout: future_booking_enabled = false by default until PWA integration verified
 --
 -- Schema relationship:
---   pass_types.organization_id -> organisations.id
+--   pass_types.org_id -> organisations.id
 --   pass_profiles.site_id -> sites.id
 --   sites.org_id -> organisations.id
 -- So we join pass_types -> sites via org_id to get site_id for profiles
@@ -39,7 +39,7 @@ SELECT DISTINCT
   false, -- Future booking OFF by default
   false  -- Availability enforcement OFF by default
 FROM pass.pass_types pt
-JOIN core.sites s ON s.org_id = pt.organization_id
+JOIN core.sites s ON s.org_id = pt.org_id
 WHERE pt.name ILIKE '%day%'
   AND pt.profile_id IS NULL
   AND NOT EXISTS (
@@ -78,7 +78,7 @@ SELECT DISTINCT
   false, -- Future booking OFF by default
   false  -- Availability enforcement OFF by default
 FROM pass.pass_types pt
-JOIN core.sites s ON s.org_id = pt.organization_id
+JOIN core.sites s ON s.org_id = pt.org_id
 WHERE (pt.name ILIKE '%camp%' OR pt.name ILIKE '%overnight%' OR pt.name ILIKE '%night%')
   AND pt.profile_id IS NULL
   AND NOT EXISTS (
@@ -93,7 +93,7 @@ SET profile_id = pp.id,
     updated_at = now()
 FROM pass.pass_profiles pp
 JOIN core.sites s ON pp.site_id = s.id
-WHERE s.org_id = pt.organization_id
+WHERE s.org_id = pt.org_id
   AND pp.code = 'end_of_day'
   AND pt.name ILIKE '%day%'
   AND pt.profile_id IS NULL;
@@ -104,7 +104,7 @@ SET profile_id = pp.id,
     updated_at = now()
 FROM pass.pass_profiles pp
 JOIN core.sites s ON pp.site_id = s.id
-WHERE s.org_id = pt.organization_id
+WHERE s.org_id = pt.org_id
   AND pp.code = 'nights_checkout'
   AND (pt.name ILIKE '%camp%' OR pt.name ILIKE '%overnight%' OR pt.name ILIKE '%night%')
   AND pt.profile_id IS NULL;
@@ -139,7 +139,7 @@ SELECT DISTINCT
   false, -- Future booking OFF
   false  -- Availability enforcement OFF
 FROM pass.pass_types pt
-JOIN core.sites s ON s.org_id = pt.organization_id
+JOIN core.sites s ON s.org_id = pt.org_id
 WHERE pt.profile_id IS NULL
   AND NOT EXISTS (
     SELECT 1 FROM pass.pass_profiles pp 
@@ -153,7 +153,7 @@ SET profile_id = pp.id,
     updated_at = now()
 FROM pass.pass_profiles pp
 JOIN core.sites s ON pp.site_id = s.id
-WHERE s.org_id = pt.organization_id
+WHERE s.org_id = pt.org_id
   AND pp.code = 'instant_access'
   AND pt.profile_id IS NULL;
 
@@ -167,6 +167,6 @@ WHERE s.org_id = pt.organization_id
 --   pp.required_inputs
 -- FROM pass.pass_types pt
 -- LEFT JOIN pass.pass_profiles pp ON pt.profile_id = pp.id
--- ORDER BY pt.organization_id, pt.name;
+-- ORDER BY pt.org_id, pt.name;
 
 COMMENT ON TABLE pass.pass_profiles IS 'Profile-driven pass configuration. All pass types should have profile_id set for API consistency.';
