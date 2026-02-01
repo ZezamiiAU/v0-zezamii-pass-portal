@@ -67,7 +67,7 @@ export async function GET(request) {
         max_uses,
         is_active,
         display_order,
-        organization_id,
+        org_id,
         profile_id,
         created_at,
         updated_at,
@@ -93,7 +93,7 @@ export async function GET(request) {
 
     // Apply filters
     if (organizationId) {
-      query = query.eq("organization_id", organizationId)
+      query = query.eq("org_id", organizationId)
     }
 
     if (siteId) {
@@ -101,12 +101,12 @@ export async function GET(request) {
       const { data: site } = await supabase
         .schema("core")
         .from("sites")
-        .select("organisation_id")
+        .select("org_id")
         .eq("id", siteId)
         .single()
       
       if (site) {
-        query = query.eq("organization_id", site.organisation_id)
+        query = query.eq("org_id", site.org_id)
       }
     }
 
@@ -120,7 +120,7 @@ export async function GET(request) {
           devices:device_id (
             site_id,
             sites:site_id (
-              organisation_id
+              org_id
             )
           )
         `)
@@ -128,8 +128,8 @@ export async function GET(request) {
         .eq("is_active", true)
         .single()
 
-      if (accesspoint?.devices?.sites?.organisation_id) {
-        query = query.eq("organization_id", accesspoint.devices.sites.organisation_id)
+      if (accesspoint?.devices?.sites?.org_id) {
+        query = query.eq("org_id", accesspoint.devices.sites.org_id)
       }
     }
 
@@ -156,7 +156,7 @@ export async function GET(request) {
         max_uses: pt.max_uses,
         is_active: pt.is_active,
         display_order: pt.display_order,
-        organization_id: pt.organization_id,
+        org_id: pt.org_id,
         created_at: pt.created_at,
         updated_at: pt.updated_at,
       }
