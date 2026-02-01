@@ -30,7 +30,7 @@ SELECT DISTINCT
   'end_of_day',
   'End of Day Pass',
   'date_select',
-  NULL,  -- No fixed duration, runs until end of day
+  NULL::INTEGER,  -- No fixed duration, runs until end of day
   '23:59:00'::TIME,  -- Cutoff at end of day
   0,     -- No entry buffer
   0,     -- No exit buffer
@@ -69,7 +69,7 @@ SELECT DISTINCT
   'nights_checkout',
   'Camping / Overnight Stay',
   'date_select',
-  NULL,  -- Variable based on nights selected
+  NULL::INTEGER,  -- Variable based on nights selected
   '10:00:00'::TIME,  -- Checkout at 10 AM
   0,     -- No entry buffer
   0,     -- No exit buffer
@@ -130,8 +130,8 @@ SELECT DISTINCT
   'instant_access',
   'Instant Access Pass',
   'instant',
-  NULL,  -- No fixed duration
-  NULL,  -- No checkout time
+  NULL::INTEGER,  -- No fixed duration
+  NULL::TIME,  -- No checkout time
   0,     -- No entry buffer
   0,     -- No exit buffer
   0,     -- No reset buffer
