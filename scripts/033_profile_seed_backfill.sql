@@ -17,7 +17,7 @@ RETURNS TABLE (
   action TEXT,
   profile_code TEXT,
   pass_type_name TEXT,
-  site_id UUID
+  linked_site_id UUID
 ) AS $$
 BEGIN
   -- Step 1: Create end_of_day profile for sites with Day pass types
@@ -120,7 +120,7 @@ BEGIN
     'linked'::TEXT as action,
     pp.code as profile_code,
     pt.name as pass_type_name,
-    pp.site_id
+    pp.site_id as linked_site_id
   FROM pass.pass_types pt
   JOIN pass.pass_profiles pp ON pt.profile_id = pp.id
   JOIN core.sites s ON pp.site_id = s.id
