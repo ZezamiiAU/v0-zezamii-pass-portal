@@ -2,8 +2,14 @@
 -- Description: Create default profiles for legacy Day and Camping pass types
 -- Non-breaking: Only affects pass types without existing profile_id
 -- Rollout: future_booking_enabled = false by default until PWA integration verified
+--
+-- Schema relationship:
+--   pass_types.organization_id -> organisations.id
+--   pass_profiles.site_id -> sites.id
+--   sites.organization_id -> organisations.id
+-- So we join pass_types -> organisations -> sites to get site_id for profiles
 
--- Step 1: Create end_of_day profile for each site that has Day pass types
+-- Step 1: Create end_of_day profile for each site in organizations that have Day pass types
 -- Day passes: valid until 23:59 on the selected date
 INSERT INTO pass.pass_profiles (
   site_id,
@@ -20,7 +26,7 @@ INSERT INTO pass.pass_profiles (
   availability_enforcement
 )
 SELECT DISTINCT
-  pt.site_id,
+  s.id,
   'end_of_day',
   'End of Day Pass',
   'date_select',
@@ -33,15 +39,16 @@ SELECT DISTINCT
   false, -- Future booking OFF by default
   false  -- Availability enforcement OFF by default
 FROM pass.pass_types pt
+JOIN core.sites s ON s.organization_id = pt.organization_id
 WHERE pt.name ILIKE '%day%'
   AND pt.profile_id IS NULL
   AND NOT EXISTS (
     SELECT 1 FROM pass.pass_profiles pp 
-    WHERE pp.site_id = pt.site_id AND pp.code = 'end_of_day'
+    WHERE pp.site_id = s.id AND pp.code = 'end_of_day'
   )
 ON CONFLICT (site_id, code) DO NOTHING;
 
--- Step 2: Create nights_checkout profile for each site that has Camping pass types
+-- Step 2: Create nights_checkout profile for each site in organizations that have Camping pass types
 -- Camping passes: checkout at 10:00 AM after N nights
 INSERT INTO pass.pass_profiles (
   site_id,
@@ -58,7 +65,7 @@ INSERT INTO pass.pass_profiles (
   availability_enforcement
 )
 SELECT DISTINCT
-  pt.site_id,
+  s.id,
   'nights_checkout',
   'Camping / Overnight Stay',
   'date_select',
@@ -71,35 +78,38 @@ SELECT DISTINCT
   false, -- Future booking OFF by default
   false  -- Availability enforcement OFF by default
 FROM pass.pass_types pt
+JOIN core.sites s ON s.organization_id = pt.organization_id
 WHERE (pt.name ILIKE '%camp%' OR pt.name ILIKE '%overnight%' OR pt.name ILIKE '%night%')
   AND pt.profile_id IS NULL
   AND NOT EXISTS (
     SELECT 1 FROM pass.pass_profiles pp 
-    WHERE pp.site_id = pt.site_id AND pp.code = 'nights_checkout'
+    WHERE pp.site_id = s.id AND pp.code = 'nights_checkout'
   )
 ON CONFLICT (site_id, code) DO NOTHING;
 
--- Step 3: Link Day pass types to end_of_day profile
+-- Step 3: Link Day pass types to end_of_day profile (via organization -> site)
 UPDATE pass.pass_types pt
 SET profile_id = pp.id,
     updated_at = now()
 FROM pass.pass_profiles pp
-WHERE pt.site_id = pp.site_id
+JOIN core.sites s ON pp.site_id = s.id
+WHERE s.organization_id = pt.organization_id
   AND pp.code = 'end_of_day'
   AND pt.name ILIKE '%day%'
   AND pt.profile_id IS NULL;
 
--- Step 4: Link Camping pass types to nights_checkout profile
+-- Step 4: Link Camping pass types to nights_checkout profile (via organization -> site)
 UPDATE pass.pass_types pt
 SET profile_id = pp.id,
     updated_at = now()
 FROM pass.pass_profiles pp
-WHERE pt.site_id = pp.site_id
+JOIN core.sites s ON pp.site_id = s.id
+WHERE s.organization_id = pt.organization_id
   AND pp.code = 'nights_checkout'
   AND (pt.name ILIKE '%camp%' OR pt.name ILIKE '%overnight%' OR pt.name ILIKE '%night%')
   AND pt.profile_id IS NULL;
 
--- Step 5: Create an instant profile for any remaining pass types without profiles
+-- Step 5: Create an instant profile for each site in organizations that have remaining pass types
 -- This ensures all pass types have a profile for API consistency
 INSERT INTO pass.pass_profiles (
   site_id,
@@ -116,7 +126,7 @@ INSERT INTO pass.pass_profiles (
   availability_enforcement
 )
 SELECT DISTINCT
-  pt.site_id,
+  s.id,
   'instant_access',
   'Instant Access Pass',
   'instant',
@@ -129,19 +139,21 @@ SELECT DISTINCT
   false, -- Future booking OFF
   false  -- Availability enforcement OFF
 FROM pass.pass_types pt
+JOIN core.sites s ON s.organization_id = pt.organization_id
 WHERE pt.profile_id IS NULL
   AND NOT EXISTS (
     SELECT 1 FROM pass.pass_profiles pp 
-    WHERE pp.site_id = pt.site_id AND pp.code = 'instant_access'
+    WHERE pp.site_id = s.id AND pp.code = 'instant_access'
   )
 ON CONFLICT (site_id, code) DO NOTHING;
 
--- Step 6: Link remaining unlinked pass types to instant_access profile
+-- Step 6: Link remaining unlinked pass types to instant_access profile (via organization -> site)
 UPDATE pass.pass_types pt
 SET profile_id = pp.id,
     updated_at = now()
 FROM pass.pass_profiles pp
-WHERE pt.site_id = pp.site_id
+JOIN core.sites s ON pp.site_id = s.id
+WHERE s.organization_id = pt.organization_id
   AND pp.code = 'instant_access'
   AND pt.profile_id IS NULL;
 
@@ -155,6 +167,6 @@ WHERE pt.site_id = pp.site_id
 --   pp.required_inputs
 -- FROM pass.pass_types pt
 -- LEFT JOIN pass.pass_profiles pp ON pt.profile_id = pp.id
--- ORDER BY pt.site_id, pt.name;
+-- ORDER BY pt.organization_id, pt.name;
 
 COMMENT ON TABLE pass.pass_profiles IS 'Profile-driven pass configuration. All pass types should have profile_id set for API consistency.';
