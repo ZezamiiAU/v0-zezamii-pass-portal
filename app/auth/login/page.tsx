@@ -24,14 +24,19 @@ export default function LoginPage() {
     setError(null)
 
     try {
+      console.log("[v0] Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL)
+      console.log("[v0] Supabase Anon Key exists:", !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
       const supabase = createClient()
+      console.log("[v0] Supabase client created, attempting login...")
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
+      console.log("[v0] Login result - error:", error)
       if (error) throw error
       router.push("/dashboard")
     } catch (error: unknown) {
+      console.error("[v0] Login error:", error)
       setError(error instanceof Error ? error.message : "An error occurred")
     } finally {
       setIsLoading(false)
