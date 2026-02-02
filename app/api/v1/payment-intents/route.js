@@ -36,35 +36,113 @@ function parseUTCTimestamp(timestamp) {
 }
 
 /**
- * Calculate valid_from and valid_to based on booking times and buffers
+ * Calculate valid_from and valid_until based on profile type and inputs
  * 
- * @param {Date|null} bookedFrom - User-selected booking start (null for enter-now)
- * @param {Date|null} bookedTo - User-selected booking end (null for enter-now)
- * @param {number} durationHours - Pass type duration in hours
- * @param {object} profile - Profile object (may be null)
- * @returns {object} { validFrom: Date, validTo: Date }
+ * Profile types:
+ * - instant: valid now for duration_hours
+ * - end_of_day: valid until checkout_time (23:59 default) on selected date
+ * - nights_checkout: valid until checkout_time (10:00 default) after N nights
+ * - date_select: user selects date, valid until end of day or checkout_time
+ * - datetime_select: user selects exact start/end times
+ * - duration_select: user selects duration from options
+ * 
+ * @param {object} params
+ * @param {Date|null} params.bookedFrom - User-selected booking start
+ * @param {Date|null} params.bookedTo - User-selected booking end (for datetime_select)
+ * @param {number|null} params.nights - Number of nights (for nights_checkout)
+ * @param {number} params.durationHours - Pass type duration in hours (fallback)
+ * @param {object|null} params.profile - Profile object
+ * @returns {object} { validFrom: Date, validUntil: Date }
  */
-function calculateAccessWindow(bookedFrom, bookedTo, durationHours, profile) {
+function calculateAccessWindow({ bookedFrom, bookedTo, nights, durationHours, profile }) {
   const now = new Date()
   
-  // Legacy "enter now" flow - no booking times
-  if (!bookedFrom || !bookedTo) {
-    const validFrom = now
-    const validTo = new Date(now.getTime() + durationHours * 60 * 60 * 1000)
-    return { validFrom, validTo }
-  }
-
-  // Booking mode - apply buffers
+  // Get buffers from profile
   const bufferBefore = profile?.entry_buffer_minutes || 0
   const bufferAfter = profile?.exit_buffer_minutes || 0
-
-  // validFrom = bookedFrom - buffer_before
-  const validFrom = new Date(bookedFrom.getTime() - bufferBefore * 60 * 1000)
   
-  // validTo = bookedTo + buffer_after
-  const validTo = new Date(bookedTo.getTime() + bufferAfter * 60 * 1000)
+  // No profile = legacy instant access
+  if (!profile) {
+    const validFrom = now
+    const validUntil = new Date(now.getTime() + durationHours * 60 * 60 * 1000)
+    return { validFrom, validUntil }
+  }
+  
+  const profileType = profile.profile_type
+  const profileCode = profile.code
+  
+  // Parse checkout_time (e.g., "23:59:00" or "10:00:00")
+  const checkoutTime = profile.checkout_time || "23:59:00"
+  const [checkoutHour, checkoutMinute] = checkoutTime.split(":").map(Number)
+  
+  // Helper: set time on a date
+  function setTimeOnDate(date, hour, minute) {
+    const result = new Date(date)
+    result.setUTCHours(hour, minute, 0, 0)
+    return result
+  }
+  
+  // Helper: get end of day for a date
+  function getEndOfDay(date) {
+    return setTimeOnDate(date, checkoutHour, checkoutMinute)
+  }
+  
+  // Helper: add days to a date
+  function addDays(date, days) {
+    const result = new Date(date)
+    result.setUTCDate(result.getUTCDate() + days)
+    return result
+  }
 
-  return { validFrom, validTo }
+  let validFrom
+  let validUntil
+  
+  switch (profileCode) {
+    case "end_of_day":
+      // Day pass: valid from now (or bookedFrom) until end of that day
+      validFrom = bookedFrom || now
+      validUntil = getEndOfDay(validFrom)
+      break
+      
+    case "nights_checkout":
+      // Camping: valid from bookedFrom until checkout_time after N nights
+      validFrom = bookedFrom || now
+      const numNights = nights || 1
+      const checkoutDate = addDays(validFrom, numNights)
+      validUntil = setTimeOnDate(checkoutDate, checkoutHour, checkoutMinute)
+      break
+      
+    case "instant_access":
+      // Instant: valid from now for duration_hours (or profile duration_minutes)
+      validFrom = now
+      const durationMins = profile.duration_minutes || (durationHours * 60)
+      validUntil = new Date(now.getTime() + durationMins * 60 * 1000)
+      break
+      
+    default:
+      // For other profile types (datetime_select, duration_select)
+      // Use booked times if provided, otherwise fallback to duration
+      if (bookedFrom && bookedTo) {
+        validFrom = new Date(bookedFrom.getTime() - bufferBefore * 60 * 1000)
+        validUntil = new Date(bookedTo.getTime() + bufferAfter * 60 * 1000)
+      } else {
+        validFrom = now
+        const defaultDuration = profile.duration_minutes || (durationHours * 60)
+        validUntil = new Date(now.getTime() + defaultDuration * 60 * 1000)
+      }
+      break
+  }
+  
+  // Apply entry buffer (allow early access)
+  const finalValidFrom = new Date(validFrom.getTime() - bufferBefore * 60 * 1000)
+  
+  // Apply exit buffer (allow late exit) - but not for end_of_day/nights_checkout as checkout is fixed
+  let finalValidUntil = validUntil
+  if (profileCode !== "end_of_day" && profileCode !== "nights_checkout") {
+    finalValidUntil = new Date(validUntil.getTime() + bufferAfter * 60 * 1000)
+  }
+  
+  return { validFrom: finalValidFrom, validUntil: finalValidUntil }
 }
 
 /**
@@ -148,6 +226,8 @@ export async function POST(request) {
           id,
           code,
           profile_type,
+          duration_minutes,
+          checkout_time,
           entry_buffer_minutes,
           exit_buffer_minutes,
           reset_buffer_minutes,
@@ -207,13 +287,17 @@ export async function POST(request) {
     // Determine if we should use booking mode
     const useBookingMode = hasBookingTimes && (profile?.future_booking_enabled || false)
 
-    // Calculate access window (valid_from / valid_to)
-    const { validFrom, validTo } = calculateAccessWindow(
-      useBookingMode ? parsedBookedFrom : null,
-      useBookingMode ? parsedBookedTo : null,
-      passType.duration_hours,
-      profile
-    )
+    // Extract nights from request body (for camping passes)
+    const nights = body.nights ? parseInt(body.nights, 10) : null
+
+    // Calculate access window using profile-driven computation
+    const { validFrom, validUntil } = calculateAccessWindow({
+      bookedFrom: parsedBookedFrom,
+      bookedTo: parsedBookedTo,
+      nights,
+      durationHours: passType.duration_hours,
+      profile,
+    })
 
     // Generate pass number
     const passNumber = generatePassNumber()
@@ -227,7 +311,7 @@ export async function POST(request) {
       guest_email: guest_email,
       guest_phone: guest_phone || null,
       valid_from: validFrom.toISOString(),
-      valid_until: validTo.toISOString(),
+      valid_until: validUntil.toISOString(),
       status: "pending", // Will be activated after payment confirmation
     }
 
