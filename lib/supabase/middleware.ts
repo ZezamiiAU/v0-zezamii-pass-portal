@@ -43,13 +43,6 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse
   }
 
-  // Check for mock auth cookie (set by client-side mock login)
-  const mockAuthCookie = request.cookies.get("mock_auth_user")
-  if (mockAuthCookie) {
-    // Mock user is authenticated, allow access
-    return supabaseResponse
-  }
-
   try {
     const {
       data: { user },
