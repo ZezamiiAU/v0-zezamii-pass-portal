@@ -1,4 +1,3 @@
-import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FileUp, Building2, MapPin, QrCode } from "lucide-react"
 import Link from "next/link"
@@ -6,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
 export default async function DashboardPage() {
-  const _supabase = await createClient()
+  // Auth is handled by the layout - no need to check here
 
   // Stats display removed until we have a working solution
 

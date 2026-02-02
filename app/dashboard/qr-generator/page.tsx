@@ -1,8 +1,19 @@
 import { redirect } from "next/navigation"
+import { cookies } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
 import { QRGeneratorClient } from "./qr-generator-client"
 
 export default async function QRGeneratorPage() {
+  // Check for mock auth cookie first
+  const cookieStore = await cookies()
+  const mockAuthCookie = cookieStore.get("mock_auth_user")
+  
+  if (mockAuthCookie) {
+    // Mock auth - return empty devices for now (no DB connection)
+    return <QRGeneratorClient devices={[]} />
+  }
+
+  // Real Supabase auth
   const supabase = await createClient()
 
   // Check authentication

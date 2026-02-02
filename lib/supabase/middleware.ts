@@ -45,10 +45,7 @@ export async function updateSession(request: NextRequest) {
 
   // Check for mock auth cookie (set by client-side mock login)
   const mockAuthCookie = request.cookies.get("mock_auth_user")
-  console.log("[v0] Middleware - Path:", request.nextUrl.pathname)
-  console.log("[v0] Middleware - Mock auth cookie exists:", !!mockAuthCookie)
   if (mockAuthCookie) {
-    console.log("[v0] Middleware - Mock auth found, allowing access")
     // Mock user is authenticated, allow access
     return supabaseResponse
   }
@@ -58,11 +55,8 @@ export async function updateSession(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser()
 
-    console.log("[v0] Middleware - Supabase user:", user?.email || "none")
-
     // No user session - redirect to login for protected routes
     if (!user && !request.nextUrl.pathname.startsWith("/auth") && request.nextUrl.pathname !== "/") {
-      console.log("[v0] Middleware - No user, redirecting to login")
       const url = request.nextUrl.clone()
       url.pathname = "/auth/login"
       return NextResponse.redirect(url)
@@ -70,7 +64,6 @@ export async function updateSession(request: NextRequest) {
 
     return supabaseResponse
   } catch (error) {
-    console.log("[v0] Middleware - Supabase error:", error)
     // On error, redirect to login rather than showing error page
     const url = request.nextUrl.clone()
     url.pathname = "/auth/login"
