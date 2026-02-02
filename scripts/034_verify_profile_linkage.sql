@@ -44,7 +44,6 @@ WHERE (pt.name ILIKE '%camp%' OR pt.name ILIKE '%overnight%' OR pt.name ILIKE '%
 SELECT 
   pt.id as pass_type_id,
   pt.name as pass_type_name,
-  pt.duration_hours,
   pp.id as profile_id,
   pp.code as profile_code,
   pp.profile_type,
