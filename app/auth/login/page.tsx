@@ -20,11 +20,33 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    const supabase = createClient()
     setIsLoading(true)
     setError(null)
 
+    // Mock auth - bypass Supabase when credentials match
+    const MOCK_AUTH_ENABLED = process.env.NEXT_PUBLIC_MOCK_AUTH === "true" || true // Enable by default for dev
+    const MOCK_USERS = [
+      { email: "admin@zezamii.com", password: "admin123" },
+      { email: "test@example.com", password: "test123" },
+    ]
+
+    if (MOCK_AUTH_ENABLED) {
+      const mockUser = MOCK_USERS.find(u => u.email === email && u.password === password)
+      if (mockUser) {
+        // Store mock session in cookie (so middleware can read it)
+        document.cookie = `mock_auth_user=${encodeURIComponent(JSON.stringify({ email: mockUser.email, role: "admin" }))}; path=/; max-age=86400`
+        router.push("/dashboard")
+        return
+      } else if (MOCK_USERS.some(u => u.email === email)) {
+        setError("Invalid password")
+        setIsLoading(false)
+        return
+      }
+    }
+
+    // Fall back to real Supabase auth
     try {
+      const supabase = createClient()
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
