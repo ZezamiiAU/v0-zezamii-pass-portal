@@ -23,12 +23,19 @@ export default async function DashboardLayout({
         email: mockUser.email,
         role: mockUser.role || "admin",
       }
+      // Mock user found - skip Supabase auth entirely and render dashboard
+      return (
+        <div className="min-h-screen bg-background">
+          <DashboardNav user={user} />
+          <main className="lg:pl-64">{children}</main>
+        </div>
+      )
     } catch {
       // Invalid cookie, continue to Supabase auth
     }
   }
 
-  // If no mock user, try Supabase auth
+  // No mock user, try Supabase auth
   if (!user) {
     try {
       const supabase = await createClient()
