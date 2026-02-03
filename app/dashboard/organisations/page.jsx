@@ -40,11 +40,14 @@ export default function OrganisationsPage() {
 
   async function fetchOrganisations() {
     try {
+      console.log("[v0] Fetching organisations from core.organisations...")
       const { data, error } = await supabase
         .schema("core")
         .from("organisations")
         .select("id, name, slug, brand_settings")
         .order("name")
+
+      console.log("[v0] Supabase response - data:", data, "error:", error)
 
       if (error) throw error
 
