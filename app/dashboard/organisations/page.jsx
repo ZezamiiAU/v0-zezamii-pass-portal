@@ -44,7 +44,6 @@ export default function OrganisationsPage() {
         .schema("core")
         .from("organisations")
         .select("id, name, slug, brand_settings")
-        .eq("is_active", true)
         .order("name")
 
       if (error) throw error
